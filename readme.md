@@ -50,4 +50,4 @@ Firmware CRC32: 0xe62d501e
 
 ### 原始readme.md
 
-[README_EN.md](/README_EN.md)
+[README_EN.md](/README_en.md)
