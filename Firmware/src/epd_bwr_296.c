@@ -3,14 +3,14 @@
 #include "main.h"
 #include "epd.h"
 #include "epd_spi.h"
-#include "epd_bwr_290.h"
+#include "epd_bwr_296.h"
 #include "drivers.h"
 #include "stack/ble/ble.h"
 
 // SSD1675 mixed with SSD1680 EPD Controller
 
-#define BWR_290_Len 50
-uint8_t LUT_bwr_290_part[] = {
+#define BWR_296_Len 50
+uint8_t LUT_bwr_296_part[] = {
 
 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -18,7 +18,7 @@ uint8_t LUT_bwr_290_part[] = {
 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-BWR_290_Len, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+BWR_296_Len, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
@@ -35,8 +35,8 @@ BWR_290_Len, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 
 };
 
-#define EPD_BWR_290_test_pattern 0xA5
-_attribute_ram_code_ uint8_t EPD_BWR_290_detect(void)
+#define EPD_BWR_296_test_pattern 0xA5
+_attribute_ram_code_ uint8_t EPD_BWR_296_detect(void)
 {
     // SW Reset
     EPD_WriteCmd(0x12);
@@ -44,20 +44,20 @@ _attribute_ram_code_ uint8_t EPD_BWR_290_detect(void)
 
     EPD_WriteCmd(0x32);
     int i;
-    for (i = 0; i < 153; i++)// This model has a 159 bytes LUT storage so we test for that
+    for (i = 0; i < 296; i++)
     {
-        EPD_WriteData(EPD_BWR_290_test_pattern);
+        EPD_WriteData(EPD_BWR_296_test_pattern);
     }
     EPD_WriteCmd(0x33);
-    for (i = 0; i < 153; i++)
+    for (i = 0; i < 296; i++)
     {
-        if(EPD_SPI_read() != EPD_BWR_290_test_pattern)
+        if(EPD_SPI_read() != EPD_BWR_296_test_pattern)
             return 0;
     }
     return 1;
 }
 
-_attribute_ram_code_ uint8_t EPD_BWR_290_read_temp(void)
+_attribute_ram_code_ uint8_t EPD_BWR_296_read_temp(void)
 {
     uint8_t epd_temperature = 0 ;
     
@@ -97,10 +97,10 @@ _attribute_ram_code_ uint8_t EPD_BWR_290_read_temp(void)
 
     // Set RAM Y- Address Start/End
     EPD_WriteCmd(0x45);
-    EPD_WriteData(0x28);
-    EPD_WriteData(0x01);
-    EPD_WriteData(0x2E);
-    EPD_WriteData(0x00);
+    EPD_WriteData(0x27);   //0x0127-->(295+1)=296
+	EPD_WriteData(0x01);
+	EPD_WriteData(0x00);
+	EPD_WriteData(0x00);
 
     // Border waveform control
     EPD_WriteCmd(0x3C);
@@ -138,7 +138,7 @@ _attribute_ram_code_ uint8_t EPD_BWR_290_read_temp(void)
     return epd_temperature;
 }
 
-_attribute_ram_code_ uint8_t EPD_BWR_290_Display(unsigned char *image, int size, uint8_t full_or_partial)
+_attribute_ram_code_ uint8_t EPD_BWR_296_Display(unsigned char *image, int size, uint8_t full_or_partial)
 {    
     uint8_t epd_temperature = 0 ;
     
@@ -178,10 +178,10 @@ _attribute_ram_code_ uint8_t EPD_BWR_290_Display(unsigned char *image, int size,
 
     // Set RAM Y- Address Start/End
     EPD_WriteCmd(0x45);
-    EPD_WriteData(0x28);
-    EPD_WriteData(0x01);
-    EPD_WriteData(0x2E);
-    EPD_WriteData(0x00);
+    EPD_WriteData(0x27);   //0x0127-->(295+1)=296
+	EPD_WriteData(0x01);
+	EPD_WriteData(0x00);
+	EPD_WriteData(0x00);
 
     // Border waveform control
     EPD_WriteCmd(0x3C);
@@ -242,9 +242,9 @@ _attribute_ram_code_ uint8_t EPD_BWR_290_Display(unsigned char *image, int size,
     if (!full_or_partial)
     {
         EPD_WriteCmd(0x32);
-        for (i = 0; i < sizeof(LUT_bwr_290_part); i++)
+        for (i = 0; i < sizeof(LUT_bwr_296_part); i++)
         {
-            EPD_WriteData(LUT_bwr_290_part[i]);
+            EPD_WriteData(LUT_bwr_296_part[i]);
         }
     }
     
@@ -258,7 +258,7 @@ _attribute_ram_code_ uint8_t EPD_BWR_290_Display(unsigned char *image, int size,
     return epd_temperature;
 }
 
-_attribute_ram_code_ void EPD_BWR_290_set_sleep(void)
+_attribute_ram_code_ void EPD_BWR_296_set_sleep(void)
 {
     // deep sleep
     EPD_WriteCmd(0x10);

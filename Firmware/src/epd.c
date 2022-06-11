@@ -7,7 +7,7 @@
 #include "epd_bwr_213.h"
 #include "epd_bw_213_ice.h"
 #include "epd_bwr_154.h"
-#include "epd_bwr_290.h"
+#include "epd_bwr_296.h"
 #include "drivers.h"
 #include "stack/ble/ble.h"
 
@@ -25,7 +25,7 @@ RAM uint8_t epd_model = 0; // 0 = Undetected, 1 = BW213, 2 = BWR213, 3 = BWR154,
 const char *epd_model_string[] = {"NC", "BW213", "BWR213", "BWR154", "213ICE", "BWR290"};
 RAM uint8_t epd_update_state = 0;
 
-const char *BLE_conn_string[] = {"", "B"};
+const char *BLE_conn_string[] = {"BLE 0", "BLE 1"};
 RAM uint8_t epd_temperature_is_read = 0;
 RAM uint8_t epd_temperature = 0;
 
@@ -137,7 +137,7 @@ _attribute_ram_code_ void EPD_Display(unsigned char *image, int size, uint8_t fu
     else if (epd_model == 4)
         epd_temperature = EPD_BW_213_ice_Display(image, size, full_or_partial);
     else if (epd_model == 5)
-        epd_temperature = EPD_BWR_290_Display(image, size, full_or_partial);
+        epd_temperature = EPD_BWR_296_Display(image, size, full_or_partial);
 
     epd_temperature_is_read = 1;
     epd_update_state = 1;
@@ -271,7 +271,7 @@ _attribute_ram_code_ void epd_display(uint32_t time_is, uint16_t battery_mv, int
     }
     else if (epd_model == 5)
     {
-        resolution_w = 250;
+        resolution_w = 296;
         resolution_h = 128;
     }
 
@@ -284,8 +284,8 @@ _attribute_ram_code_ void epd_display(uint32_t time_is, uint16_t battery_mv, int
     sprintf(buff, "%s", BLE_conn_string[ble_get_connected()]);
     obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 232, 20, (char *)buff, 1);
     sprintf(buff, "%02d:%02d", ((time_is / 60) / 60) % 24, (time_is / 60) % 60);
-    obdWriteStringCustom(&obd, (GFXfont *)&DSEG14_Classic_Mini_Regular_40, 50, 65, (char *)buff, 1);
-    sprintf(buff, "%d'C", EPD_read_temp());
+    obdWriteStringCustom(&obd, (GFXfont *)&DSEG14_Classic_Mini_Regular_40, 75, 65, (char *)buff, 1);
+    sprintf(buff, "-----%d'C-----", EPD_read_temp());
     obdWriteStringCustom(&obd, (GFXfont *)&Special_Elite_Regular_30, 10, 95, (char *)buff, 1);
     sprintf(buff, "Battery %dmV", battery_mv);
     obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 10, 120, (char *)buff, 1);
