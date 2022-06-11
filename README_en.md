@@ -10,7 +10,7 @@ This repo is made together with this explanation video:(click on it)
 [![YoutubeVideo](https://img.youtube.com/vi/ANHz7EgWx7k/0.jpg)](https://www.youtube.com/watch?v=ANHz7EgWx7k)
 
 
-WebSerial Firmware flasher Tool: 
+WebSerial Firmware flasher Tool:
 https://atc1441.github.io/ATC_TLSR_Paper_UART_Flasher.html
 
 WebBluetooth Image Uploader:
