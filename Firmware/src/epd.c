@@ -7,6 +7,7 @@
 #include "epd_bwr_213.h"
 #include "epd_bw_213_ice.h"
 #include "epd_bwr_154.h"
+#include "epd_bwr_290.h"
 #include "drivers.h"
 #include "stack/ble/ble.h"
 
@@ -20,8 +21,8 @@ extern const uint8_t ucMirror[];
 #include "font16.h"
 #include "font30.h"
 
-RAM uint8_t epd_model = 0; // 0 = Undetected, 1 = BW213, 2 = BWR213, 3 = BWR154, 4 = BW213ICE
-const char *epd_model_string[] = {"NC", "BW213", "BWR213", "BWR154", "213ICE"};
+RAM uint8_t epd_model = 0; // 0 = Undetected, 1 = BW213, 2 = BWR213, 3 = BWR154, 4 = BW213ICE, 5 BWR290
+const char *epd_model_string[] = {"NC", "BW213", "BWR213", "BWR154", "213ICE", "BWR290"};
 RAM uint8_t epd_update_state = 0;
 
 const char *BLE_conn_string[] = {"", "B"};
@@ -55,6 +56,10 @@ _attribute_ram_code_ void EPD_detect_model(void)
 
     // Here we neeed to detect it
     if (EPD_BWR_213_detect())
+    {
+        epd_model = 5;
+    }
+    else if (EPD_BWR_213_detect())
     {
         epd_model = 2;
     }
@@ -98,7 +103,7 @@ _attribute_ram_code_ uint8_t EPD_read_temp(void)
         epd_temperature = EPD_BWR_213_read_temp();
     else if (epd_model == 3)
         epd_temperature = EPD_BWR_154_read_temp();
-    else if (epd_model == 4)
+    else if (epd_model == 4 || epd_model == 5)
         epd_temperature = EPD_BW_213_ice_read_temp();
 
     EPD_POWER_OFF();
@@ -131,6 +136,8 @@ _attribute_ram_code_ void EPD_Display(unsigned char *image, int size, uint8_t fu
         epd_temperature = EPD_BWR_154_Display(image, size, full_or_partial);
     else if (epd_model == 4)
         epd_temperature = EPD_BW_213_ice_Display(image, size, full_or_partial);
+    else if (epd_model == 5)
+        epd_temperature = EPD_BWR_290_Display(image, size, full_or_partial);
 
     epd_temperature_is_read = 1;
     epd_update_state = 1;
@@ -147,7 +154,7 @@ _attribute_ram_code_ void epd_set_sleep(void)
         EPD_BWR_213_set_sleep();
     else if (epd_model == 3)
         EPD_BWR_154_set_sleep();
-    else if (epd_model == 4)
+    else if (epd_model == 4 || epd_model == 5)
         EPD_BW_213_ice_set_sleep();
 
     EPD_POWER_OFF();
@@ -262,12 +269,17 @@ _attribute_ram_code_ void epd_display(uint32_t time_is, uint16_t battery_mv, int
         resolution_w = 212;
         resolution_h = 104;
     }
+    else if (epd_model == 5)
+    {
+        resolution_w = 250;
+        resolution_h = 128;
+    }
 
     obdCreateVirtualDisplay(&obd, resolution_w, resolution_h, epd_temp);
     obdFill(&obd, 0, 0); // fill with white
 
     char buff[100];
-    sprintf(buff, "ESL_%02X%02X%02X %s", mac_public[2], mac_public[1], mac_public[0], epd_model_string[epd_model]);
+    sprintf(buff, "S24_%02X%02X%02X %s", mac_public[2], mac_public[1], mac_public[0], epd_model_string[epd_model]);
     obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 1, 17, (char *)buff, 1);
     sprintf(buff, "%s", BLE_conn_string[ble_get_connected()]);
     obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 232, 20, (char *)buff, 1);
