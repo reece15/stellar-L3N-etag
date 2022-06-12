@@ -55,7 +55,7 @@ _attribute_ram_code_ void EPD_detect_model(void)
     WaitMs(10);
 
     // Here we neeed to detect it
-    if (EPD_BWR_213_detect())
+    if (EPD_BWR_296_detect())
     {
         epd_model = 5;
     }

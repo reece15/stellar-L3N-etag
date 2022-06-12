@@ -44,12 +44,12 @@ _attribute_ram_code_ uint8_t EPD_BWR_296_detect(void)
 
     EPD_WriteCmd(0x32);
     int i;
-    for (i = 0; i < 296; i++)
+    for (i = 0; i < 153; i++)  // FIXME  DETECT MODEL 296
     {
         EPD_WriteData(EPD_BWR_296_test_pattern);
     }
     EPD_WriteCmd(0x33);
-    for (i = 0; i < 296; i++)
+    for (i = 0; i < 153; i++)
     {
         if(EPD_SPI_read() != EPD_BWR_296_test_pattern)
             return 0;
