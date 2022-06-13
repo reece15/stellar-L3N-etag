@@ -21,8 +21,8 @@ extern const uint8_t ucMirror[];
 #include "font16.h"
 #include "font30.h"
 
-RAM uint8_t epd_model = 0; // 0 = Undetected, 1 = BW213, 2 = BWR213, 3 = BWR154, 4 = BW213ICE, 5 BWR290
-const char *epd_model_string[] = {"NC", "BW213", "BWR213", "BWR154", "213ICE", "BWR290"};
+RAM uint8_t epd_model = 0; // 0 = Undetected, 1 = BW213, 2 = BWR213, 3 = BWR154, 4 = BW213ICE, 5 BWR296
+const char *epd_model_string[] = {"NC", "BW213", "BWR213", "BWR154", "213ICE", "BWR296"};
 RAM uint8_t epd_update_state = 0;
 
 const char *BLE_conn_string[] = {"BLE 0", "BLE 1"};
