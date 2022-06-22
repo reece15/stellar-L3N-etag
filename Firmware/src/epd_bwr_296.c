@@ -60,7 +60,7 @@ _attribute_ram_code_ uint8_t EPD_BWR_296_detect(void)
 _attribute_ram_code_ uint8_t EPD_BWR_296_read_temp(void)
 {
     uint8_t epd_temperature = 0 ;
-    
+
     // SW Reset
     EPD_WriteCmd(0x12);
 
@@ -118,7 +118,7 @@ _attribute_ram_code_ uint8_t EPD_BWR_296_read_temp(void)
     // Display update control
     EPD_WriteCmd(0x22);
     EPD_WriteData(0xB1);
-    
+
     // Master Activation
     EPD_WriteCmd(0x20);
 
@@ -126,11 +126,11 @@ _attribute_ram_code_ uint8_t EPD_BWR_296_read_temp(void)
 
     // Temperature sensor read from register
     EPD_WriteCmd(0x1B);
-    epd_temperature = EPD_SPI_read();    
+    epd_temperature = EPD_SPI_read();
     EPD_SPI_read();
 
     WaitMs(5);
-    
+
     // deep sleep
     EPD_WriteCmd(0x10);
     EPD_WriteData(0x01);
@@ -138,10 +138,9 @@ _attribute_ram_code_ uint8_t EPD_BWR_296_read_temp(void)
     return epd_temperature;
 }
 
-_attribute_ram_code_ uint8_t EPD_BWR_296_Display(unsigned char *image, int size, uint8_t full_or_partial)
-{    
+_attribute_ram_code_ uint8_t EPD_BWR_296_Display(unsigned char *image, int size, uint8_t full_or_partial) {
     uint8_t epd_temperature = 0 ;
-    
+
     // SW Reset
     EPD_WriteCmd(0x12);
 
@@ -178,7 +177,7 @@ _attribute_ram_code_ uint8_t EPD_BWR_296_Display(unsigned char *image, int size,
 
     // Set RAM Y- Address Start/End
     EPD_WriteCmd(0x45);
-    EPD_WriteData(0x27);   //0x0127-->(295+1)=296
+    EPD_WriteData(0x28);   //0x0127-->(295+1)=296
 	EPD_WriteData(0x01);
 	EPD_WriteData(0x00);
 	EPD_WriteData(0x00);
@@ -199,7 +198,7 @@ _attribute_ram_code_ uint8_t EPD_BWR_296_Display(unsigned char *image, int size,
     // Display update control
     EPD_WriteCmd(0x22);
     EPD_WriteData(0xB1);
-    
+
     // Master Activation
     EPD_WriteCmd(0x20);
 
@@ -207,7 +206,7 @@ _attribute_ram_code_ uint8_t EPD_BWR_296_Display(unsigned char *image, int size,
 
     // Temperature sensor read from register
     EPD_WriteCmd(0x1B);
-    epd_temperature = EPD_SPI_read();    
+    epd_temperature = EPD_SPI_read();
     EPD_SPI_read();
 
     WaitMs(5);
@@ -232,7 +231,7 @@ _attribute_ram_code_ uint8_t EPD_BWR_296_Display(unsigned char *image, int size,
     EPD_WriteData(0x28);
     EPD_WriteData(0x01);
 
-    EPD_WriteCmd(0x26);// RED Color TODO make something out of it :)
+    EPD_WriteCmd(0x26);
     int i;
     for (i = 0; i < size; i++)
     {
@@ -247,11 +246,11 @@ _attribute_ram_code_ uint8_t EPD_BWR_296_Display(unsigned char *image, int size,
             EPD_WriteData(LUT_bwr_296_part[i]);
         }
     }
-    
+
     // Display update control
     EPD_WriteCmd(0x22);
     EPD_WriteData(0xC7);
-    
+
     // Master Activation
     EPD_WriteCmd(0x20);
 

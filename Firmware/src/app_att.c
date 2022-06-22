@@ -91,6 +91,7 @@ static const  u8 my_EPD_BLEUUID[16]				= { EPD_BLE_CHAR_UUID };
 #define EPD_BLE_SERVICE_UUID 0x38, 0x9a, 0x7d, 0x21, 0xd3, 0x83, 0x4e, 0x04, 0xba, 0xa3, 0xa9, 0xeb, 0x10, 0x7b, 0x18, 0x13
 static const  u8 my_EPD_BLE_ServiceUUID[16]		= { EPD_BLE_SERVICE_UUID };
 static u8 	  my_EPD_BLE_Data 					= 0x00;
+static u8  my_EPD_BLEInCCC[2];
 
 // Include attribute (Battery service)
 static const u16 include[3] = {BATT_PS_H, BATT_LEVEL_INPUT_CCB_H, SERVICE_UUID_BATTERY};
@@ -150,7 +151,7 @@ static const u8 my_RxTxCharVal[5] = {
 
 //// EPD_BLE attribute values
 static const u8 my_EPD_BLECharVal[19] = {
-	CHAR_PROP_READ | CHAR_PROP_WRITE,
+	CHAR_PROP_NOTIFY | CHAR_PROP_WRITE,
 	U16_LO(EPD_BLE_CMD_OUT_DP_H), U16_HI(EPD_BLE_CMD_OUT_DP_H),
 	EPD_BLE_CHAR_UUID,
 };
@@ -196,9 +197,10 @@ static const attribute_t my_Attributes[] = {
 	{0,ATT_PERMISSIONS_WRITE, 2,sizeof(my_RxTx_Data),(u8*)(&my_RxTxUUID),	(&my_RxTx_Data), &RxTxWrite},			//value
 	{0,ATT_PERMISSIONS_RDWR,2,sizeof(RxTxValueInCCC),(u8*)(&clientCharacterCfgUUID), 	(u8*)(RxTxValueInCCC), 0},	//value
 	////////////////////////////////////// EPD_BLE ////////////////////////////////////////////////////
-	{3,ATT_PERMISSIONS_READ, 2, 16,(u8*)(&my_primaryServiceUUID), (u8*)(&my_EPD_BLE_ServiceUUID), 0},
+	{4,ATT_PERMISSIONS_READ, 2, 16,(u8*)(&my_primaryServiceUUID), (u8*)(&my_EPD_BLE_ServiceUUID), 0},
 	{0,ATT_PERMISSIONS_READ, 2, sizeof(my_EPD_BLECharVal), (u8*)(&my_characterUUID), (u8*)(my_EPD_BLECharVal), 0},
 	{0,ATT_PERMISSIONS_WRITE, 16, sizeof(my_EPD_BLE_Data), (u8*)(&my_EPD_BLEUUID),	(&my_EPD_BLE_Data), (att_readwrite_callback_t) &epd_ble_handle_write},
+	{0,ATT_PERMISSIONS_RDWR, 2, sizeof(my_EPD_BLEInCCC),(u8*)(&clientCharacterCfgUUID), 	(u8*)(my_EPD_BLEInCCC), 0},	//value
 };
 
 void my_att_init(void)
