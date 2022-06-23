@@ -5,7 +5,7 @@
 #include "stack/ble/ble.h"
 #include "vendor/common/blt_common.h"
 
-#include "time.h"
+#include "etime.h"
 #include "flash.h"
 
 extern settings_struct settings;

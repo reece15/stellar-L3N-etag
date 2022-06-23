@@ -3,7 +3,7 @@
 #include "drivers.h"
 #include "stack/ble/ble.h"
 #include "drivers/8258/flash.h"
-#include "time.h"
+#include "etime.h"
 #include "main.h"
 
 RAM uint16_t time_trime = 5000;// The higher the number the slower the time runs!, -32,768 to 32,767 

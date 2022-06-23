@@ -11,7 +11,7 @@
 #include "flash.h"
 #include "ota.h"
 #include "epd.h"
-#include "time.h"
+#include "etime.h"
 #include "bart_tif.h"
 
 RAM uint8_t battery_level;
