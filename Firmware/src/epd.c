@@ -25,6 +25,11 @@ RAM uint8_t epd_model = 0; // 0 = Undetected, 1 = BW213, 2 = BWR213, 3 = BWR154,
 const char *epd_model_string[] = {"NC", "BW213", "BWR213", "BWR154", "213ICE", "BWR296"};
 RAM uint8_t epd_update_state = 0;
 
+RAM uint8_t epd_scene = 1;
+
+RAM uint8_t hour_refresh = 100;
+RAM uint8_t minute_refresh = 100;
+
 const char *BLE_conn_string[] = {"BLE 0", "BLE 1"};
 RAM uint8_t epd_temperature_is_read = 0;
 RAM uint8_t epd_temperature = 0;
@@ -39,6 +44,13 @@ void set_EPD_model(uint8_t model_nr)
 {
     epd_model = model_nr;
 }
+
+// With this we can force a display if it wasnt detected correctly
+void set_EPD_scene(uint8_t scene)
+{
+    epd_scene = scene;
+}
+
 
 // Here we detect what E-Paper display is connected
 _attribute_ram_code_ void EPD_detect_model(void)
@@ -309,4 +321,27 @@ _attribute_ram_code_ void epd_display_char(uint8_t data)
 _attribute_ram_code_ void epd_clear(void)
 {
     memset(epd_buffer, 0x00, epd_buffer_size);
+}
+
+void epd_update(uint32_t time_is, uint16_t battery_mv, int16_t temperature) {
+    if (epd_scene == 1) {
+        // default scene: show default time, battery, ble address, temperature
+        uint8_t current_minute = (get_time() / 60) % 60;
+        if (current_minute != minute_refresh)
+        {
+            minute_refresh = current_minute;
+            uint8_t current_hour = ((get_time() / 60) / 60) % 24;
+            if (current_hour != hour_refresh)
+            {
+                hour_refresh = current_hour;
+                epd_display(get_time(), battery_mv, temperature, 1);
+            }
+            else
+            {
+                epd_display(get_time(), battery_mv, temperature, 0);
+            }
+        }
+    } else if (epd_scene == 0) {
+        // nothing to do.
+    }
 }

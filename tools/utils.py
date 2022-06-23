@@ -29,15 +29,11 @@ def hex2image(hex_string, width, height):
     image.show('test')
 
 
-def image2hex(image, width=296, height=128, steinberg=False):
+def image2hex(image, width=296, height=128):
     if isinstance(image, str):
         image = Image.open(image)
 
-    mode = None
-    if steinberg:
-        mode = Image.FLOYDSTEINBERG
-
-    return bytes2hex(image.resize((width, height)).rotate(90, expand=True).resize((height, width)).convert('1', dither=mode).tobytes())
+    return bytes2hex(image.resize((width, height)).rotate(90, expand=True).resize((height, width)).convert('1').tobytes())
 
 
 def load_test_image(name):

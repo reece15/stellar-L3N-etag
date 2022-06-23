@@ -65,4 +65,7 @@ void cmd_parser(void * p){
 	else if(inData == 0xE0){// force set an EPD model, if it wasnt detect automatically correct
 		set_EPD_model(req->dat[1]);
 	}
+	else if(inData == 0xE1){// force set an EPD scene
+		set_EPD_scene(req->dat[1]);
+	}
 }

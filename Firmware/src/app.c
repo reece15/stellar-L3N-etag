@@ -18,9 +18,6 @@ RAM uint8_t battery_level;
 RAM uint16_t battery_mv;
 RAM int16_t temperature;
 
-RAM uint8_t hour_refresh = 100;
-RAM uint8_t minute_refresh = 100;
-
 // Settings
 extern settings_struct settings;
 
@@ -58,21 +55,7 @@ _attribute_ram_code_ void main_loop(void)
         ble_send_temp(EPD_read_temp() * 10);
     }
 
-    uint8_t current_minute = (get_time() / 60) % 60;
-    if (current_minute != minute_refresh)
-    {
-        minute_refresh = current_minute;
-        uint8_t current_hour = ((get_time() / 60) / 60) % 24;
-        if (current_hour != hour_refresh)
-        {
-            hour_refresh = current_hour;
-            epd_display(get_time(), battery_mv, temperature, 1);
-        }
-        else
-        {
-            epd_display(get_time(), battery_mv, temperature, 0);
-        }
-    }
+    epd_update(get_time(), battery_mv, temperature);
 
     if (time_reached_period(Timer_CH_0, 10))
     {

@@ -5,6 +5,8 @@
 #define epd_buffer_size ((epd_height/8) * epd_width)
 
 void set_EPD_model(uint8_t model_nr);
+void set_EPD_scene(uint8_t scene);
+
 void init_epd(void);
 uint8_t EPD_read_temp(void);
 void EPD_Display(unsigned char *image, int size, uint8_t full_or_partial);
@@ -14,3 +16,5 @@ void epd_set_sleep(void);
 uint8_t epd_state_handler(void);
 void epd_display_char(uint8_t data);
 void epd_clear(void);
+
+void epd_update(uint32_t time_is, uint16_t battery_mv, int16_t temperature);
