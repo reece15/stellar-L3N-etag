@@ -122,6 +122,8 @@
 		  	addLog("时间设置为: " + localeTimeString + " : dd" + intToHex(unixNow, 4));
 		  	await rxTxSendCommand(hexToBytes('dd' +
 					[intToHex(unixNow, 4), intToHex(year, 2), intToHex(month, 1), intToHex(day, 1), intToHex(week, 1)].join('')));
+
+			await rxTxSendCommand(hexToBytes('e2'))
 		}
 
 		async function triggerRxTxCmd(cmd) {

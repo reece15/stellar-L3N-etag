@@ -50,6 +50,10 @@ void set_EPD_model(uint8_t model_nr)
 void set_EPD_scene(uint8_t scene)
 {
     epd_scene = scene;
+    set_EPD_wait_flush();
+}
+
+void set_EPD_wait_flush() {
     epd_wait_update = 1;
 }
 

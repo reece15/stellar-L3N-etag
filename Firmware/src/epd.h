@@ -6,6 +6,7 @@
 
 void set_EPD_model(uint8_t model_nr);
 void set_EPD_scene(uint8_t scene);
+void set_EPD_wait_flush();
 
 void init_epd(void);
 uint8_t EPD_read_temp(void);
