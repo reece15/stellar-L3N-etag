@@ -1,0 +1,436 @@
+
+<!-- saved from url=(0057)https://atc1441.github.io/ATC_TLSR_Paper_OTA_writing.html -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><title>ATC_TLSR_Paper BLE control</title>
+</head>
+
+<body>
+  <script>
+
+    let bleDevice;
+    let gattServer;
+    let Theservice;
+    let ServiceMain;
+    let settingsCharacteristics;
+    let writeCharacteristic;
+    let busy = false;
+    let imgArray;
+    let imgArrayLen = 0;
+    let uploadPart = 0;
+    let startTime = 0;
+    let reconnectTrys = 0;
+
+    function delay(delayInms) {
+      return new Promise(resolve => {
+        setTimeout(() => {
+          resolve(2);
+        }, delayInms);
+      });
+    }
+
+    function resetVariables() {
+      busy = false;
+      gattServer = null;
+      Theservice = null;
+      writeCharacteristic = null;
+      document.getElementById("log").value = '';
+    }
+
+    function decimalToHex(d, padding) {
+      var hex = Number(d).toString(16);
+      padding = typeof (padding) === "undefined" || padding === null ? padding = 2 : padding;
+
+      while (hex.length < padding) {
+        hex = "0" + hex;
+      }
+
+      return hex;
+    }
+
+    function handleError(error) {
+      console.log(error);
+      resetVariables();
+      if (bleDevice == null)
+        return;
+      if (reconnectTrys <= 5) {
+        reconnectTrys++;
+        connect();
+      }
+      else {
+        addLog("Was not able to connect, aborting");
+        reconnectTrys = 0;
+      }
+    }
+
+    async function sendCommand(cmd) {
+      if (writeCharacteristic) {
+        await writeCharacteristic.writeValue(cmd);
+      }
+    }
+
+    async function rxTxSendCommand(cmd) {
+      if (settingsCharacteristics) {
+        await settingsCharacteristics.writeValue(cmd);
+      }
+    }
+
+    function readFlash(readAddress) {
+      hex_address = decimalToHex(readAddress, 8);
+      addLog("Reading address: " + hex_address + " now");
+      raw_cmd = "04" + hex_address;
+      addLog("Sending: " + raw_cmd);
+      cmd = hexToBytes(raw_cmd);
+      sendCommand(cmd);
+      console.log('CMD was Send');
+    }
+
+    function readRam(readAddress) {
+      hex_address = decimalToHex(readAddress, 8);
+      addLog("Reading address: " + hex_address + " now");
+      raw_cmd = "05" + hex_address;
+      addLog("Sending: " + raw_cmd);
+      cmd = hexToBytes(raw_cmd);
+      sendCommand(cmd).then(() => {
+        console.log('CMD was Send');
+      })
+        .catch(handleError);
+    }
+
+    function writeFW(writeAddress, data) {
+    }
+
+    var fwSizeComplete = 0;
+    var fwBytesTransmited = 0;
+
+    // Sending a 0x100 long dataset to a bank at given address
+    async function sendPart(address, data) {
+      hex_address = decimalToHex(address, 8);
+      var part_len = 480;
+      while (data.length) {
+        var cur_part_len = part_len;
+        if (data.length < part_len)
+          cur_part_len = data.length;
+        var data_part = data.substring(0, cur_part_len);
+        data = data.substring(cur_part_len);
+        console.log("Sub Part: " + "03" + data_part);
+        await sendCommand(hexToBytes("03" + data_part));
+        fwBytesTransmited += cur_part_len;
+        setStatus('Current part: ' + fwBytesTransmited / 2 + " All: " + fwSizeComplete / 2 + " Time: " + (new Date().getTime() - startTime) / 1000.0 + "s");
+      }
+      await sendCommand(hexToBytes("02" + hex_address));
+      console.log("Writing bank: " + hex_address);
+      await delay(50);
+    }
+
+    async function eraseFwArea() {
+      var fwAreaSize = 0x20000;
+      var fwCurAddress = 0x20000;
+      while (fwCurAddress < (0x20000 + fwAreaSize)) {
+        hex_address = decimalToHex(fwCurAddress, 8);
+        console.log("Erasing block: " + hex_address);
+        await sendCommand(hexToBytes("01" + hex_address));
+        fwCurAddress += 0x1000;
+      }
+    }
+
+    async function doCRCcheck(localCRC) {
+      await sendCommand(hexToBytes("06"));
+    }
+
+    async function doFinalFlash(crc) {
+      addLog("Sending Final flash: " + "07C001CEED" + crc);
+      await sendCommand(hexToBytes("07C001CEED" + crc));
+    }
+
+    function calculateCRC(localData) {
+      var checkPosistion = 0;
+      var outCRC = 0;
+      addLog(Number("0x" + localData.substring(checkPosistion, checkPosistion + 2)));
+      while (checkPosistion < 0x40000) {
+        if (checkPosistion < localData.length)
+          outCRC += Number("0x" + localData.substring(checkPosistion, checkPosistion + 2));
+        else
+          outCRC += 0xff;
+        checkPosistion += 2;
+      }
+      return decimalToHex(outCRC & 0xffff, 4);
+    }
+
+    async function sendFile(address, data) {
+      startTime = new Date().getTime();
+      var part_len = 0x200;
+      var addressOffset = 0;
+      var inCRC = calculateCRC(data);
+      addLog("File CRC = " + inCRC);
+      fwSizeComplete = data.length;
+      fwBytesTransmited = 0;
+      await eraseFwArea();
+      while (data.length) {
+        var cur_part_len = part_len;
+        if (data.length < part_len)
+          cur_part_len = data.length;
+        var data_part = data.substring(0, cur_part_len);
+        data = data.substring(cur_part_len);
+        await sendPart(address + addressOffset, data_part);
+        addressOffset += cur_part_len / 2;
+      }
+      await doFinalFlash(inCRC);
+    }
+
+    function sendcmd(cmdTXT) {
+      console.log('SendCMDnow');
+      let cmd = hexToBytes(cmdTXT);
+      addLog('Send CMD: ' + cmdTXT);
+      console.log('Send CMD: ');
+      console.log(cmdTXT);
+      console.log('Send CMD bytes: ');
+      console.log(cmd);
+      sendCommand(cmd).then(() => {
+        console.log('CMD was Send');
+      })
+        .catch(handleError);
+    }
+
+    function sendimg(cmdIMG) {
+      imgArray = cmdIMG.replace(/(?:\r\n|\r|\n|,|0x| )/g, '');
+      imgArrayLen = imgArray.length;
+      uploadPart = 0;
+      console.log('Sending image ' + imgArrayLen);
+      sendCommand(hexToBytes("0000")).then(() => {
+        sendCommand(hexToBytes("020000")).then(() => {
+          sendIMGpart();
+        })
+      })
+        .catch(handleError);
+    }
+
+    function sendIMGpart() {
+      if (imgArray.length > 0) {
+        let currentpart = "03" + imgArray.substring(0, 38);
+        imgArray = imgArray.substring(38);
+        setStatus('Current part: ' + uploadPart++);
+        console.log('Curr Part: ' + currentpart);
+        sendCommand(hexToBytes(currentpart)).then(() => {
+          sendIMGpart();
+        })
+      } else {
+        console.log('Last Part: ' + imgArray);
+        sendCommand(hexToBytes("01")).then(() => {
+          console.log('Update was send');
+        })
+      }
+    }
+
+    function disconnect() {
+      resetVariables();
+      console.log('Disconnected.');
+      addLog('Disconnected.');
+      document.getElementById("connectbutton").innerHTML = 'Connect';
+    }
+
+    function handleNotify(data) {
+      addLog("Got bytes: " + bytesToHex(data.buffer));
+    }
+
+    function preConnect() {
+      if (gattServer != null && gattServer.connected) {
+        if (bleDevice != null && bleDevice.gatt.connected)
+          bleDevice.gatt.disconnect();
+      }
+      else {
+        connectTrys = 0;
+        navigator.bluetooth.requestDevice({ optionalServices: ['0000221f-0000-1000-8000-00805f9b34fb', '00001f10-0000-1000-8000-00805f9b34fb', '13187b10-eba9-a3ba-044e-83d3217d9a38'], acceptAllDevices: true }).then(device => {
+          device.addEventListener('gattserverdisconnected', disconnect);
+          bleDevice = device;
+          connect();
+        }).catch(handleError);
+      }
+    }
+
+    function reConnect() {
+      connectTrys = 0;
+      if (bleDevice != null && bleDevice.gatt.connected)
+        bleDevice.gatt.disconnect();
+      resetVariables();
+      addLog("Reconnect");
+      setTimeout(function () { connect(); }, 300);
+    }
+
+    function connect() {
+      if (writeCharacteristic == null) {
+        addLog("Connecting to: " + bleDevice.name);
+        bleDevice.gatt.connect().then(server => {
+          console.log('> Found GATT server');
+          gattServer = server;
+          return gattServer.getPrimaryService('0000221f-0000-1000-8000-00805f9b34fb');
+        })
+          .then(service => {
+            console.log('> Found service');
+            Theservice = service;
+            return Theservice.getCharacteristic('0000331f-0000-1000-8000-00805f9b34fb');
+          })
+          .then(characteristic => {
+            console.log('> Found write characteristic');
+            addLog('> Found write characteristic');
+            document.getElementById("connectbutton").innerHTML = 'Disconnect';
+            writeCharacteristic = characteristic;
+            return writeCharacteristic.startNotifications().then(() => {
+              writeCharacteristic.addEventListener('characteristicvaluechanged', event => {
+                var value = event.target.value;
+                handleNotify(value);
+              });
+              connect_to_rxtx();
+            });
+          })
+          .catch(handleError);
+      }
+    }
+
+    function connect_to_rxtx() {
+      gattServer.getPrimaryServices().then(services => {
+        for (var i = 0; i < services.length; i++) {
+          console.log("Services: " + services[i].uuid);
+          if (services[i].uuid == "00001f10-0000-1000-8000-00805f9b34fb") {
+            gattServer.getPrimaryService('00001f10-0000-1000-8000-00805f9b34fb')
+              .then(service => {
+                addLog("Found custom Main service");
+                ServiceMain = service;
+                return ServiceMain.getCharacteristic('00001f1f-0000-1000-8000-00805f9b34fb');
+              }).then(characteristic => {
+                addLog("Found custom write characteristic");
+                settingsCharacteristics = characteristic;
+              }).catch();
+            return;
+          }
+        }
+      }).catch();
+    }
+
+    function setTime(hourOffset) {
+      let unixNow = Math.round(Date.now() / 1000)+(60*60*hourOffset);
+	  
+	  var s = new Date(unixNow*1000).toLocaleTimeString("de-DE")
+
+      addLog("Setting time : " + s + " : dd" + intToHex4(unixNow));
+      rxTxSendCommand(hexToBytes("dd" + intToHex4(unixNow)));
+    }
+	
+	function sendForceEpd(nr)
+	{
+      addLog("Forcing EPD : e0" + byteToHex(nr+1));
+      rxTxSendCommand(hexToBytes("e0" + byteToHex(nr+1)));
+	}
+
+    function setStatus(statusText) {
+      document.getElementById("status").innerHTML = statusText;
+    }
+
+    function addLog(logTXT) {
+      var today = new Date();
+      var time = ("0" + today.getHours()).slice(-2) + ":" + ("0" + today.getMinutes()).slice(-2) + ":" + ("0" + today.getSeconds()).slice(-2) + " : ";
+      document.getElementById("log").innerHTML += time + logTXT + '<br>';
+      console.log(time + logTXT);
+      while ((document.getElementById("log").innerHTML.match(/<br>/g) || []).length > 10) {
+        var logs_br_position = document.getElementById("log").innerHTML.search("<br>");
+        document.getElementById("log").innerHTML = document.getElementById("log").innerHTML.substring(logs_br_position + 4);
+      }
+    }
+
+    function hexToBytes(hex) {
+      for (var bytes = [], c = 0; c < hex.length; c += 2)
+        bytes.push(parseInt(hex.substr(c, 2), 16));
+      return new Uint8Array(bytes);
+    }
+
+    function bytesToHex(data) {
+      return new Uint8Array(data).reduce(function (memo, i) {
+        return memo + ("0" + i.toString(16)).slice(-2);
+      }, "");
+    }
+
+    function byteToHex(intIn) {
+      var stringOut = "";
+      stringOut = ("0" + intIn.toString(16)).substr(-2)
+      return stringOut;
+    }
+
+    function intToHex(intIn) {
+      var stringOut = "";
+      stringOut = ("0000" + intIn.toString(16)).substr(-4)
+      return stringOut.substring(2, 4) + stringOut.substring(0, 2);
+    }
+
+    function intToHex4(intIn) {
+      var stringOut = "";
+      stringOut = ("00000000" + intIn.toString(16)).substr(-8)
+      return stringOut;
+    }
+
+    window.onload = function () {
+      document.querySelector("#file").addEventListener("change", function () {
+        var reader = new FileReader();
+        reader.onload = function () {
+          firmwareArray = bytesToHex(this.result);
+          if (firmwareArray.substring(16, 24) != "4b4e4c54") {
+            alert("Select file is no telink firmware .bin");
+            addLog("Select file is no telink firmware .bin");
+            firmwareArray = "";
+            return;
+          }
+          addLog("File was selected, size: " + firmwareArray.length / 2 + " bytes");
+          document.getElementById("cmdIMAGE").value = firmwareArray;
+        }
+        if (this.files[0] != null)
+          reader.readAsArrayBuffer(this.files[0]);
+        else
+          addLog("No file selected");
+      }, false);
+    }
+
+    function resetFileSelector() {
+      document.getElementById("file").value = '';
+    };
+
+
+  </script>
+  Welcome to ATCnetz.de ATC_TLSR_Paper BLE control,<br>Click connect and select the TLSR E-Paper display you want to
+  talk to.<br><br>
+  The ATC_TLSR_Paper Firmware can be found here: <a href="https://github.com/atc1441/ATC_TLSR_Paper" target="_blank">https://github.com/atc1441/ATC_TLSR_Paper</a><br><br>
+  <button id="connectbutton" type="button" onclick="preConnect();">Connect</button>
+  <button id="connectbutton" type="button" onclick="reConnect();">Reconnect</button>
+  <button id="connectbutton" type="button" onclick="document.getElementById(&#39;log&#39;).innerHTML = &#39;&#39;;">Clear Log</button>
+  <br><br>
+  <div id="status">Current part: 92416 All: 92416 Time: 46.629s</div><br>
+  Please select a .bin file you want to flash to the Telink BLE device.<br>
+  Connect to the Display and click on "Send Firmware" after the display is connected.<br>
+  after all bytes are uploaded the display will do a CRC check and flash and reboot into the new firmware if all is
+  ok.<br><br>
+  Select Firmware: <input type="file" accept=".bin" id="file" onclick="resetFileSelector();"><br><br>
+  <button type="button" onclick="sendFile(0x20000,document.getElementById(&quot;cmdIMAGE&quot;).value);">Send
+    Firmware</button><br>
+  <textarea id="cmdIMAGE" rows="12" cols="100"></textarea><br><br>
+  <label for="hour">Hour offset:</label>
+<input type="number" id="hourOffset" min="-12" max="12" value="2"><br>
+  <button type="button" onclick="setTime(document.getElementById(&quot;hourOffset&quot;).value);">Set Time</button><br><br>
+  <label for="hour">Force EPD Model:</label>
+<select id="forceEPDselection">
+  <option>BW213</option>
+  <option>BWR213</option>
+  <option>BWR154</option>
+  <option>213ICE</option>
+</select>
+  <button type="button" onclick="sendForceEpd(document.getElementById(&quot;forceEPDselection&quot;).selectedIndex);">Force EPD</button><br><br>
+  <input type="text" id="positionText" value="20000">
+  <button type="button" onclick="readFlash(Number(&#39;0x&#39;+document.getElementById(&quot;positionText&quot;).value));">readFlash</button><br>
+  <input type="text" id="positionTextRam" value="0">
+  <button type="button" onclick="readRam(Number(&#39;0x&#39;+document.getElementById(&quot;positionTextRam&quot;).value));">readRam</button><br>
+  <br>
+  <br>
+  <input type="text" id="cmdTXT" value="0055">
+  <button type="button" onclick="sendcmd(document.getElementById(&quot;cmdTXT&quot;).value);">SendCMD</button><br><br>
+  <button id="w_fw_button" type="button" onclick="writeFW(0x20000,&#39;1212123234321234&#39;);">Write FW</button><br>
+  <button type="button" onclick="doFinalFlash();">final flash</button><br>
+  <div id="log">03:22:40 : Got bytes: 0100038000<br>03:22:40 : Got bytes: 0100039000<br>03:22:40 : Got bytes: 010003a000<br>03:22:40 : Got bytes: 010003b000<br>03:22:40 : Got bytes: 010003c000<br>03:22:40 : Got bytes: 010003d000<br>03:22:40 : Got bytes: 010003e000<br>03:22:40 : Got bytes: 010003f000<br>03:23:23 : Sending Final flash: 07C001CEEDff7b<br>03:23:43 : Disconnected.<br></div>
+
+
+
+</body></html>

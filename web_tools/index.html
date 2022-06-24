@@ -117,10 +117,11 @@
 		}
 
 		async function setTime() {
-			const { unixNow, localeTimeString } = getUnixTime();
+			const { unixNow, localeTimeString, year, month, day, week } = getUnixTime();
 
-		  	addLog("时间设置为: " + localeTimeString + " : dd" + intToHex4(unixNow));
-		  	await rxTxSendCommand(hexToBytes("dd" + intToHex4(unixNow)));
+		  	addLog("时间设置为: " + localeTimeString + " : dd" + intToHex(unixNow, 4));
+		  	await rxTxSendCommand(hexToBytes('dd' +
+					[intToHex(unixNow, 4), intToHex(year, 2), intToHex(month, 1), intToHex(day, 1), intToHex(week, 1)].join('')));
 		}
 
 		async function triggerRxTxCmd(cmd) {
@@ -230,23 +231,24 @@
 				}, "");
 		}
 
-		function intToHex4(intIn) {
-		  	let stringOut = "";
-		  	stringOut = ("00000000" + intIn.toString(16)).substr(-8)
-		  	return stringOut;
+		function intToHex(intIn, bytes=4) {
+		  	return intIn.toString(16).padStart(bytes * 2, '0');
 		}
 
 		function getUnixTime() {
 			const hourOffset = document.getElementById('hour-offset').value;
 		  	const unixNow = Math.round(Date.now() / 1000)+(60*60*hourOffset)  - new Date().getTimezoneOffset() * 60;
-		  	const localeTimeString = new Date((unixNow + new Date().getTimezoneOffset() * 60)*1000).toLocaleTimeString();
-			return {unixNow, localeTimeString}
+
+			const date = new Date((unixNow + new Date().getTimezoneOffset() * 60)*1000);
+		  	const localeTimeString = date.toLocaleTimeString();
+
+			return {unixNow, localeTimeString, year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), week: date.getDay()}
 		}
 
 		document.body.onload = () => {
 			setInterval(() => {
-				const { localeTimeString } = getUnixTime();
-				document.getElementById('time-setter').innerText = `设置时间为：${localeTimeString}`;
+				const { localeTimeString, year, month, day, week } = getUnixTime();
+				document.getElementById('time-setter').innerText = `设置时间为：${year}-${month}-${day} ${localeTimeString} 星期${week}`;
 			}, 1)
 		}
 

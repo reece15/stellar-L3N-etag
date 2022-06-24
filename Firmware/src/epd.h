@@ -1,5 +1,5 @@
 #pragma once
-
+#include "etime.h"
 #define epd_height 128
 #define epd_width 296
 #define epd_buffer_size ((epd_height/8) * epd_width)
@@ -16,8 +16,8 @@ uint8_t epd_state_handler(void);
 void epd_display_char(uint8_t data);
 void epd_clear(void);
 
-void update_time_scene(uint32_t _time, uint16_t battery_mv, int16_t temperature, void (*scene)(uint32_t, uint16_t, int16_t,  uint8_t));
-void epd_update(uint32_t _time, uint16_t battery_mv, int16_t temperature);
+void update_time_scene(struct date_time _time, uint16_t battery_mv, int16_t temperature, void (*scene)(struct date_time, uint16_t, int16_t,  uint8_t));
+void epd_update(struct date_time _time, uint16_t battery_mv, int16_t temperature);
 
-void epd_display(uint32_t _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial);
-void epd_display_time_with_date(uint32_t _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial);
+void epd_display(struct date_time _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial);
+void epd_display_time_with_date(struct date_time _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial);

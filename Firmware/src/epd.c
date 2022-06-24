@@ -253,7 +253,7 @@ _attribute_ram_code_ void epd_display_tiff(uint8_t *pData, int iSize)
 }
 
 extern uint8_t mac_public[6];
-_attribute_ram_code_ void epd_display(uint32_t _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial)
+_attribute_ram_code_ void epd_display(struct date_time _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial)
 {
     uint8_t battery_level;
 
@@ -301,7 +301,7 @@ _attribute_ram_code_ void epd_display(uint32_t _time, uint16_t battery_mv, int16
     obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 1, 17, (char *)buff, 1);
     sprintf(buff, "%s", BLE_conn_string[ble_get_connected()]);
     obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 232, 20, (char *)buff, 1);
-    sprintf(buff, "%02d:%02d", ((_time / 60) / 60) % 24, (_time / 60) % 60);
+    sprintf(buff, "%02d:%02d", _time.tm_hour, _time.tm_min);
     obdWriteStringCustom(&obd, (GFXfont *)&DSEG14_Classic_Mini_Regular_40, 75, 65, (char *)buff, 1);
     sprintf(buff, "-----%d'C-----", EPD_read_temp());
     obdWriteStringCustom(&obd, (GFXfont *)&Special_Elite_Regular_30, 10, 95, (char *)buff, 1);
@@ -325,10 +325,8 @@ _attribute_ram_code_ void epd_clear(void)
 {
     memset(epd_buffer, 0x00, epd_buffer_size);
 }
-void update_time_scene(uint32_t _time, uint16_t battery_mv, int16_t temperature, void (*scene)(uint32_t, uint16_t, int16_t,  uint8_t)) {
+void update_time_scene(struct date_time _time, uint16_t battery_mv, int16_t temperature, void (*scene)(struct date_time, uint16_t, int16_t,  uint8_t)) {
     // default scene: show default time, battery, ble address, temperature
-    uint8_t current_minute = (_time / 60) % 60;
-
     if (epd_update_state)
         return;
 
@@ -342,13 +340,12 @@ void update_time_scene(uint32_t _time, uint16_t battery_mv, int16_t temperature,
         epd_wait_update = 0;
     }
 
-    else if (current_minute != minute_refresh)
+    else if (_time.tm_min != minute_refresh)
     {
-        minute_refresh = current_minute;
-        uint8_t current_hour = ((_time / 60) / 60) % 24;
-        if (current_hour != hour_refresh)
+        minute_refresh = _time.tm_min;
+        if (_time.tm_hour != hour_refresh)
         {
-            hour_refresh = current_hour;
+            hour_refresh = _time.tm_hour;
             scene(_time, battery_mv, temperature, 1);
         }
         else
@@ -358,7 +355,7 @@ void update_time_scene(uint32_t _time, uint16_t battery_mv, int16_t temperature,
     }
 }
 
-void epd_update(uint32_t _time, uint16_t battery_mv, int16_t temperature) {
+void epd_update(struct date_time _time, uint16_t battery_mv, int16_t temperature) {
     switch(epd_scene) {
         case 1:
             update_time_scene(_time, battery_mv, temperature, epd_display);
@@ -371,7 +368,7 @@ void epd_update(uint32_t _time, uint16_t battery_mv, int16_t temperature) {
     }
 }
 
-void epd_display_time_with_date(uint32_t _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial) {
+void epd_display_time_with_date(struct date_time _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial) {
     uint16_t battery_level;
 
     obdCreateVirtualDisplay(&obd, epd_width, epd_height, epd_temp);
@@ -388,7 +385,7 @@ void epd_display_time_with_date(uint32_t _time, uint16_t battery_mv, int16_t tem
 
     obdRectangle(&obd, 0, 25, 295, 27, 1, 1);
 
-    sprintf(buff, "%02d:%02d", ((_time / 60) / 60) % 24, (_time / 60) % 60);
+    sprintf(buff, "%02d:%02d", _time.tm_hour, _time.tm_min);
     obdWriteStringCustom(&obd, (GFXfont *)&DSEG14_Classic_Mini_Regular_40, 35, 85, (char *)buff, 1);
 
     sprintf(buff, "   %d'C", EPD_read_temp());
@@ -402,7 +399,7 @@ void epd_display_time_with_date(uint32_t _time, uint16_t battery_mv, int16_t tem
     obdRectangle(&obd, 214, 27, 216, 99, 1, 1);
     obdRectangle(&obd, 0, 97, 295, 99, 1, 1);
 
-    sprintf(buff, "%d-%02d-%02d", 2022, 6, 24);
+    sprintf(buff, "%d-%02d-%02d   XING QI: %d", _time.tm_year, _time.tm_month, _time.tm_day, _time.tm_week);
     obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 10, 120, (char *)buff, 1);
 
 
