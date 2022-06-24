@@ -17,7 +17,6 @@
 #include "OneBitDisplay.h"
 #include "TIFF_G4.h"
 extern const uint8_t ucMirror[];
-#include "Roboto_Black_80.h"
 #include "font_60.h"
 #include "font16.h"
 #include "font30.h"
