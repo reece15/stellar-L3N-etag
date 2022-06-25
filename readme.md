@@ -65,7 +65,7 @@ Firmware CRC32: 0xe62d501e
 - [x] 图片模式
 - [ ] web 支持图片切换
 - [x] 添加新的时间场景
-- [x] 设置年月日
+- [x] 支持设置年月日
 
 ### 计划新增
 - [ ] 安卓端控制器
@@ -85,3 +85,9 @@ Firmware CRC32: 0xe62d501e
 ### 原始readme.md
 
 [README_EN.md](/README_en.md)
+
+### 资料
+
+- [TLSR8359规格说明书](/docs/DS_TLSR8359-E_Datasheet for Telink ULP 2.4GHz RF SoC TLSR8359.pdf)
+- [tlsr8x5x蓝牙开发说明书（中文）](/docs/Telink Kite BLE SDK Developer Handbook中文.pdf)
+- [屏幕驱动说明书 SSD1680.pdf](/docs/SSD1680.pdf)
