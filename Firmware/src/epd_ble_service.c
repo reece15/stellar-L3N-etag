@@ -15,7 +15,7 @@ extern uint8_t *epd_temp;
 		return 0;                    \
 	}
 
-extern unsigned char epd_buffer[epd_buffer_size];
+extern uint8_t epd_buffer[epd_buffer_size];
 unsigned int byte_pos = 0;
 
 int epd_ble_handle_write(void *p)
@@ -47,16 +47,14 @@ int epd_ble_handle_write(void *p)
 		return 0;
 	// Write data to image buffer.
 	case 0x03:
-		if (byte_pos + payload_len - 1 >= epd_buffer_size + 1)
+		if ((payload[1] << 8 | payload[2]) + payload_len - 3 >= epd_buffer_size + 1)
 		{
 		    out_buffer[0] = 0x00;
 		    out_buffer[1] = 0x00;
 		    bls_att_pushNotifyData(EPD_BLE_CMD_OUT_DP_H, out_buffer, 2);
 			return 0;
 		}
-		memcpy(epd_buffer + byte_pos, payload + 1, payload_len - 1);
-
-		byte_pos += payload_len - 1;
+		memcpy(epd_buffer + (payload[1] << 8 | payload[2]), payload + 3, payload_len - 3);
 
 		out_buffer[0] = payload_len >> 8;
 		out_buffer[1] = payload_len & 0xff;

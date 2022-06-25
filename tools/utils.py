@@ -1,6 +1,7 @@
 import os
 
 from PIL import Image
+from PIL.Image import Dither # noqa
 
 
 def hex2bytes(hex_string):
@@ -29,11 +30,13 @@ def hex2image(hex_string, width, height):
     image.show('test')
 
 
-def image2hex(image, width=296, height=128):
+def image2hex(image, width=296, height=128, dither=Dither.NONE):
     if isinstance(image, str):
         image = Image.open(image)
 
-    return bytes2hex(image.resize((width, height)).rotate(90, expand=True).resize((height, width)).convert('1').tobytes())
+    image = image.resize((width, height)).rotate(90, expand=True)
+    # image.show()
+    return bytes2hex(image.resize((height, width)).convert('1', dither=dither).tobytes())
 
 
 def load_test_image(name):

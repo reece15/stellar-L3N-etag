@@ -4,6 +4,25 @@
 	<meta charset="utf-8">
 	<meta http-equiv="content-type" content="text/html; charset=utf-8">
 	<title>电子价签蓝牙控制器</title>
+	<style>
+		#tool-box>* {
+			margin-right: 5px;
+		}
+		* {
+			padding: 0;
+			margin: 0;
+		}
+		button,a {
+			padding: 2px;
+			margin: 2px;
+			display: inline-block;
+		}
+		body {
+			padding: 20px;
+		}
+	</style>
+	<script type="application/javascript" src="js/dithering.js"></script>
+	<script type="application/javascript" src="js/utils.js"></script>
 </head>
 
 <body>
@@ -51,6 +70,8 @@
 		async function sendCommand(cmd) {
 			if (epdCharacteristic) {
 				await epdCharacteristic.writeValueWithResponse(cmd)
+			} else {
+				addLog('服务不可用。蓝牙链接上了吗？')
 			}
 		}
 
@@ -63,10 +84,12 @@
 		async function rxTxSendCommand(cmd) {
 		  if (rxtxCharacteristic) {
 			await rxtxCharacteristic.writeValueWithResponse(cmd);
+		  } else {
+			  addLog('服务不可用。蓝牙链接上了吗？')
 		  }
 		}
 
-		async function upload_tiff() {
+		async function upload_tiff_image() {
 			const startTime = new Date().getTime();
 			const buffer = await document.getElementById('tiff_file').files[0].arrayBuffer();
 			const arr = bytesToHex(buffer);
@@ -80,13 +103,38 @@
 			const step = 480;
 			let partIndex = 0;
 			for (let i = 0; i < arr.length; i += step) {
-				addLog(`正在上传第${partIndex+1}块. 块大小: ${step + 2}byte`);
+				addLog(`正在上传第${partIndex+1}块. 块大小: ${step + 1}byte`);
 				await sendCommand(hexToBytes("03" + arr.slice(i, i + step)));
 				partIndex += 1;
 			}
 
 			await sendCommand(hexToBytes("04"));
 			addLog(`上传tiff完成，耗时${(new Date().getTime() - startTime)/1000}s`);
+		}
+
+		async function upload_image() {
+			const canvas = document.getElementById('canvas');
+			const value = bytesToHex(canvas2bytes(canvas));
+
+			const startTime = new Date().getTime();
+
+			addLog(`开始刷新屏幕内存, 大小 ${value.length/2/1024}KB`);
+
+			await sendCommand(hexToBytes("0000"));
+
+			await sendCommand(hexToBytes("020000"));
+
+			const step = 480;
+			let partIndex = 0;
+			for (let i = 0; i < value.length; i += step) {
+				addLog(`正在发送第${partIndex+1}块. 块大小: ${step/2 + 3}byte. 起始位置: ${i/2}`);
+				await sendCommand(hexToBytes("03" + intToHex(i / 2, 2) + value.substring(i, i + step)));
+				partIndex += 1;
+			}
+
+			await sendCommand(hexToBytes("01"))
+
+			addLog(`刷新完成，耗时${(new Date().getTime() - startTime)/1000}s`);
 		}
 
 		async function upload_epd_buffer() {
@@ -102,16 +150,13 @@
 			const step = 480;
 			let partIndex = 0;
 			for (let i = 0; i < value.length; i += step) {
-				addLog(`正在发送第${partIndex+1}块. 块大小: ${step + 2}byte`);
-				await sendCommand(hexToBytes("03" + value.substring(i, i + step)));
-				await delay(50);
+				addLog(`正在发送第${partIndex+1}块. 块大小: ${step/2 + 3}byte. 起始位置: ${i/2}`);
+				await sendCommand(hexToBytes("03" + intToHex(i / 2, 2) + value.substring(i, i + step)));
 				partIndex += 1;
 			}
-			await sendCommand(hexToBytes("03" + value.substring(value.length-step, value.length)));
-			await delay(50);
+			await delay(150);
 
 			await sendCommand(hexToBytes("01"))
-			await delay(50);
 
 			addLog(`刷新完成，耗时${(new Date().getTime() - startTime)/1000}s`);
 		}
@@ -176,10 +221,6 @@
 			setTimeout(async function () { await connect(); }, 300);
 		}
 
-		function handleNotify(data) {
-		  addLog("接受到字节: " + bytesToHex(data.buffer));
-		}
-
 		async function connect() {
 			if (epdCharacteristic == null) {
 				addLog("正在链接: " + bleDevice.name);
@@ -197,7 +238,7 @@
 
 				epdCharacteristic.addEventListener('characteristicvaluechanged', (event) => {
 					console.log('epd ret', bytesToHex(event.target.value.buffer))
-					const count = parseInt('0x'+ bytesToHex(event.target.value.buffer)) * 2;
+					const count = parseInt('0x'+ bytesToHex(event.target.value.buffer));
 					addLog(`> [来自屏幕]: 收到${count} byte数据`);
 				});
 
@@ -220,23 +261,6 @@
 			dom.scrollTop = dom.scrollHeight;
 		}
 
-		function hexToBytes(hex) {
-			for (var bytes = [], c = 0; c < hex.length; c += 2)
-				bytes.push(parseInt(hex.substr(c, 2), 16));
-			return new Uint8Array(bytes);
-		}
-
-		function bytesToHex(data) {
-			return new Uint8Array(data).reduce(
-				function (memo, i) {
-					return memo + ("0" + i.toString(16)).slice(-2);
-				}, "");
-		}
-
-		function intToHex(intIn, bytes=4) {
-		  	return intIn.toString(16).padStart(bytes * 2, '0');
-		}
-
 		function getUnixTime() {
 			const hourOffset = document.getElementById('hour-offset').value;
 		  	const unixNow = Math.round(Date.now() / 1000)+(60*60*hourOffset)  - new Date().getTimezoneOffset() * 60;
@@ -244,24 +268,223 @@
 			const date = new Date((unixNow + new Date().getTimezoneOffset() * 60)*1000);
 		  	const localeTimeString = date.toLocaleTimeString();
 
-			return {unixNow, localeTimeString, year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), week: date.getDay()}
+			return {unixNow, localeTimeString, year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate(), week: date.getDay() || 7}
+		}
+
+		async function update_image () {
+			const image_file = document.getElementById('image_file');
+			if (image_file.files.length > 0) {
+				const file = image_file.files[0];
+
+				const canvas = document.getElementById("canvas");
+				const ctx = canvas.getContext("2d");
+
+				const image = new Image();
+				image.src = URL.createObjectURL(file);
+				image.onload = function(event) {
+					URL.revokeObjectURL(this.src);
+					ctx.drawImage(image, 0, 0, image.width, image.height, 0, 0, canvas.width, canvas.height);
+					convert_dithering()
+				}
+			}
+		}
+
+		function get_position(canvas, x, y){
+			let rect = canvas.getBoundingClientRect()
+			return {
+				x: x - rect.left * (canvas.width/rect.width),
+				y: y - rect.top * (canvas.height/rect.height)
+			}
+		}
+
+		function clear_canvas() {
+			if(confirm('确认清除屏幕?')) {
+				const canvas = document.getElementById('canvas');
+				const ctx = canvas.getContext("2d");
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+			}
+		}
+
+		function convert_dithering() {
+			const canvas = document.getElementById('canvas');
+			const ctx = canvas.getContext("2d");
+			dithering(ctx, canvas.width, canvas.height, parseInt(document.getElementById('threshold').value), document.getElementById('dithering').value);
 		}
 
 		document.body.onload = () => {
 			setInterval(() => {
 				const { localeTimeString, year, month, day, week } = getUnixTime();
 				document.getElementById('time-setter').innerText = `设置时间为：${year}-${month}-${day} ${localeTimeString} 星期${week}`;
-			}, 1)
-		}
+			}, 1000);
 
+			const canvas = document.getElementById('canvas');
+
+			let is_allow_drawing = false;
+			let is_allow_move_editor = false;
+			const image_mode = document.getElementById('canvas-mode');
+			const paint_size = document.getElementById('paint-size');
+			const paint_color = document.getElementById('paint-color');
+			const editor = document.getElementById('edit-font');
+			const font = document.getElementById('font');
+			document.getElementById('dithering').value = 'Atkinson';
+			image_mode.value = 'paint';
+			paint_color.value = 'black';
+			font.value = '黑体';
+
+			editor.onmousemove = function (e) {
+				editor.style.fontSize = `${paint_size.value * 10}px`;
+				editor.style.color = paint_color.value;
+				editor.style.fontFamily = font.value;
+
+				if (is_allow_move_editor) {
+					const {x, y} = get_position(canvas, e.clientX, e.clientY);
+					if (x < 0 || y < 0 || x > canvas.width || y > canvas.height) {
+						return;
+					}
+
+					editor.style.left = `${e.clientX-50}px`;
+					editor.style.top = `${e.clientY-50}px`;
+
+				}
+			}
+
+			editor.onmousedown = function (e) {
+				is_allow_move_editor = true;
+			}
+
+			editor.onmouseup = function (e) {
+				is_allow_move_editor = false;
+			}
+
+			document.getElementById('update-text').onclick = function () {
+				if (!editor.value.length) {
+					alert('请先输入文字');
+					return;
+				}
+				editor.style.display = 'none';
+				const ctx = canvas.getContext("2d");
+				ctx.beginPath();
+				ctx.font = `${paint_size.value * 10}px ${font.value}`;
+				ctx.fillStyle = paint_color.value;
+				const {x, y} = get_position(canvas, parseInt(editor.style.left), parseInt(editor.style.top) + paint_size.value * 10);
+
+				ctx.fillText(editor.value, x, y);
+			}
+
+			image_mode.onchange = function (e) {
+				if (image_mode.value === 'font') {
+					document.getElementById('update-text').style.display = 'inline-block';
+					document.getElementById('font').style.display = 'inline-block';
+
+					editor.style.display='block';
+					editor.style.left = `${e.clientX}px`;
+					editor.style.top = `${e.clientY}px`;
+					return;
+				}
+				document.getElementById('update-text').style.display = 'none';
+				document.getElementById('font').style.display = 'none';
+				editor.style.display='none';
+			}
+
+			paint_size.onchange = function () {
+				if (image_mode.value === 'font') {
+					editor.style.fontSize =  `${paint_size.value * 10}px`;
+				}
+			}
+
+			paint_color.onchange = function () {
+				if (image_mode.value === 'font') {
+					editor.style.color = paint_color.value;
+				}
+			}
+
+			font.onchange = function () {
+				if (image_mode.value === 'font') {
+					editor.style.fontFamily = font.value;
+				}
+			}
+
+			canvas.onmousedown = function(e) {
+				let ele = get_position(canvas, e.clientX, e.clientY)
+				let { x, y } = ele
+				const ctx = canvas.getContext("2d");
+
+				switch (image_mode.value) {
+					case 'paint':
+						is_allow_drawing = true;
+						ctx.beginPath();
+						ctx.moveTo(x, y);
+						break;
+					case 'font':
+						if (editor.style.display === 'none') {
+							editor.style.display='block';
+							editor.style.left = `${e.clientX}px`;
+							editor.style.top = `${e.clientY}px`;
+							editor.style.fontSize = `${paint_size.value * 10}px`;
+							editor.style.color = paint_color.value;
+							editor.style.fontFamily = font.value;
+						}
+
+						break
+					default:
+						break;
+				}
+			};
+
+			canvas.onmousemove = (e) => {
+				const ctx = canvas.getContext("2d");
+				let ele = get_position(canvas, e.clientX, e.clientY)
+				let { x, y } = ele;
+				switch (image_mode.value) {
+					case 'paint':
+						if (is_allow_drawing) {
+							ctx.lineWidth = paint_size.value;
+							ctx.strokeStyle=paint_color.value;
+							ctx.lineTo(x, y);
+							ctx.stroke();
+						}
+						break;
+					case 'font':
+						break;
+
+					default:
+						break;
+				}
+			}
+
+			canvas.onmouseup = function() {
+				switch (image_mode.value) {
+					case 'paint':
+						is_allow_drawing = false;
+						break;
+
+					case 'font':
+						editor.focus();
+						is_allow_move_editor = false;
+						break;
+
+					default:
+						break;
+				}
+			}
+
+			canvas.onmouseleave = function () {
+				if (image_mode.value === 'paint') {
+					is_allow_drawing = false;
+				}
+			}
+		}
 	</script>
 	<h2>电子价签蓝牙控制器</h2>
+	<a href="/uart_flasher.html">串口升级</a><a href="/ATC_TLSR_Paper%20BLE%20control.html">串口升级</a>
+		<br>
 
 	<button id="connectbutton" type="button" onclick="preConnect();">链接</button>
 	<button type="button" onclick="reConnect();">重新链接</button>
 	<button type="button" onclick="document.getElementById('log').innerHTML = '';">清空日志</button>
 	<br><br>
 
+	<h3>指令控制</h3>
 	<input type="text" id="cmdTXT" value="0055">
 	<button type="button" onclick="triggerEpdCmd(document.getElementById(&quot;cmdTXT&quot;).value);">发送指令</button>
 	<br>
@@ -273,20 +496,69 @@
 	<button type="button" onclick="clearScreen('ff')">清屏全白</button>
 	<br><br>
 
-	<button type="button" onclick="upload_epd_buffer();">上传图片到显示器内存</button>
+	<h3>上传图片到屏幕</h3>
+	<input type="file" id="image_file" onchange="update_image()">
+	抖动算法：
+	<select id="dithering" title="抖动算法">
+		<option value="none">二值化</option>
+		<option value="bayer">bayer</option>
+		<option value="floydsteinberg">floydsteinberg</option>
+		<option value="Atkinson">Atkinson</option>
+	</select>
+	阈值:
+	<input type="number" max="255" min="0" value="125" id="threshold">
+	<button onclick="update_image()">重新加载</button>
 	<br>
-	<textarea id="buffer" rows="10" cols="90">00240219fffed5094098000000000000828ab4897f6b6aa129420000000a824008290042f7db6a8884a89248000554141244aa567e255624281440012490a10000d2400c790aa2a901020010000082822a091112554a954250480880000454500006490e4110097908802402a950a90a55724250041552a821008014020055400000205510420480010800a0000154105aa97008a111211088000aa000002982285444201404080200000550201240482a80a88042a000080800aa0002a814220400020128020a202005520080044108002000400228008020220a40000014420000000400805501001aa9040400010900000000000002441164ab4000012800000000000002900026aaa5100012014248008000040015203b5556422048000400020400104040034d52291909000000004000204000955ca9a954aaa0000200000000000000225655440220000000000000000000040bfad2bad0a4088080200000000200103edd1ad50500001012020000110001411bf569b892810000000002044000000e7f6e98ee0810248005e000010008050097dbaebba08000024a9500000000202f5d7555de55020008154000104493c2801fddb56a30882240ba9400012101e1af776b6db9670000084a50000044ebe923ddf6dad48a000023da9501001cc7cc477badb774a0088901baaa00159d61cc54ed76ddca1020000bd94900505effdd41bedb6b6142000096b6a40a866ec7ec40f5adbda00001222ad555c12915eff84ffed6d6c2504000153aaa6094abefffc35b7b6d820204047aca9448c241ffbad0fdadb748900010ed5552203b55ffffd476d6ddd2802041fb5555948ca8fbff63bf6b6b13120202beaaaa4011056ffe773dbdbd6620000af6aaaaac016177ff9fdad6d78d691003ddaaa921c2a9d7ff5f7f5b7a0cf80116f755555498970bfe5feaeda90ada400b5fd5544299214fff9dfb56dcb5fd042d556aa24d4c0493efffb6fb760ad5001adfaa5512149a0afffffdadac55fb10ab7df552c95a2153fffeef56f6116c0035f6954952c449157ffffdfbba54d5023ebffaaa804a595afdfff756d6a97a207eaed5545688068f3fff7eef7b1554043f5b564a2126a9487bfdff5ad4292b407def5eaa144905051dbfedef7b74e8503f3556ab49242820f6fffeb5aa75a6207dfeaaa4248a228a2bfff5bb7c54aa813eab555550a1085177fffed684b3a4003dbd755584cd350b9bfff5bda5eea5243fa79aaa20aa8a246dffbeeb572595003f596abd24528293abfdeb49459749403eed2a8b09a5490577dff92c26dca4121faaaab7418a28a5af7fe5438bab52801d55655d10645152daf79558a2ed95280faab52b624610ab6b5caaad53aa950207d56aad08024244b5555552a5d51488277ad52702100811a54aaaad728ac64003ed6a92584025996ab55552fb25699103ffaa570029054db4aaaabff912954409f5d55100000496bf956adffa0aa52823fab54e220424aaddf5b5bff8868aa000fb5ab300408277621495fff8d2555240edd54a0002009ab9d6d7dff902455400756ab512082455fe1253bff80550a1042b56ca002016965fa29bbff90624a810555b55000088126ffcebdfed6480a481eca42511000a4ab7fc17fffba6013205ba2fda001201115fd74bbfbae00808a5ee9052000104601efda1bee7b9105a92bb27bd209422495beb749bddefcf294beec0da020a08853ffdda7f377bff1614aba9ba000a2025beab6d08eddefd9282f4d2ab0004a2457bf6f55fbf77b7d914af2974002008a1bd5dac35ebdeffee12fbaa6b090242356ff774eebd7bdeed282ee16a00040413bb7bbebbefeffbf082b5ab552110129affded4debb7d6fc5e00a054a4080422fb6fb79ebddd7ff7ba42ab2ea02210054ffefad7d777fbbfdd1aa8b55404408a6b7bef5afddedefffe65546ab04520354beffabf5777f7f6f50007db5122a40a137fb7aafddd5fbff2a685b5700061046eddf53faf7ffaffd19507daa11280522177d55575d5bff6dc86d2edd0480880455f746ddf7fed17beb543ab6020a28db81ff8deebdab7fb7e4aa1f6b2848400777bd4777d77effd769b41add000405143bf785bafbedffa9ecd51f761090a0f62fdedf6f547deef5f6544baf0040112ebf7db5daf0177bbf77550ed540021937dffeeeefa01d6fbfbf549fa724044c7b5dd77b7a802da997dbaa8eab00840b7ffffbadaf001bf665eb8a875540104bf5ff6d77f5017d7ff07dca15ea040121db6dfbdd5e006fb7d695c58f6a400081fbffdeb7ea0857df626ce27d0a092425fffff5ed5c00eea78bff75faf5000191ffdb7b5bf6017f7d5fe1aff3ba4002043effd77d5e10bdaabdae3fc36e1048a2b7fffdd7ea0037ab6f55bf07fb4009b16feed6babe006f7fd895fd415d01020419fffbefd701e5ffaeabf637f64051495dfbfcb57a059a6adf5779515a00580273bfb73faf8067bdbf93e059eb044ca86fffffc57ac00fcaffe5d4a1b4007e8aeff6fdf9dfe01afff7e048215a103fdcf5dfefb6b5521fffbef99289aa013ff8ffffffff4bfdf6aafbfe8810d5025dfafffdbb6af4b77fffeffaa54aba131fe67fbfffffbe9ddbffff2ec000c9082ffdfdf7dfdaebe2faad1df33c40502207fdfffefb7f7ebd177e4afdd710de0297feffffeff5abefe9d57afe77486b119fffffffffdefebafff8ff771db4fd0a7fffffffbef7abefaa7eaf1b96d22aa51ffffffffffafebdffaff3edf7287f153fffffffffaf57ef6fdbfdced1d66aa55ffffffffbfbfabbfad7fafeb3b835555fffffffff7d5feeaff7fdef067236955fffffffffefeabbff77feeff2fa5b555ffffffff7fd7feedbdfdd7e35f835aabffffffffeefaabffef7fef75f843a555ffffffffffdffea0117fef37e762faaafffffffffb6aab154a7fe7f5aa875555dffffff77ffff0aaa95bd76edde1daaa7fffffdfffd50a91253f56fd56a3652afffffffffffd4a4c94958f5e8d01baaaffffffbdffa8a552aaaabebc4002d5555dffffddefe5292a494a95d5ea81f95577dfffbdffd4a4a5520f7bfe600355555dfffffdff8a95512952dfff62d1eaaaa5ffefbdfe29552ffffda3754d4175555a7ff7dbf8a5207ffffe12de46a9aa92a5aeffdff55409ffffff41219b50f4aaaabff7bbe492d7fffffe545ccd69a555555bfbdbcaaa4fffdfff23220ea9faaaaaaafbdba4953ffdfeefac954b50a555556dfbdb15497feffffffea92951faaaab557dda52557f73fbfffaa55250a54a5556fdc14aa5fdc7effff4548924f4aaaaab7d14a92bffaffffbf54a6a915aaaaab5be829557ef2fbfefb5291244e555555af055524efebfffbff4a54928b529556b4488954fef5ffffffa955290ea820aad1455493f8f1dfdfff9524c54b454a2aaaa892abf5fafeffff24aa2a4d12aa954a264a4be5fafffff79281542694494925f15557cbedffffdfca6e490742a4a453faa4afabfffbfeffc29120558915124bfa528fd7fffff7ffe8a4aa8660a4a9571a955fcbffefdfffe208904b9a0005261a492eefdfbffffff8a0a286492a9253b9549fe3fefffffdfc0b292b55400129f5255ff7ffff7fefdf208086aaa8a54449555ff3f3ffff7fff882408552b522b24893fffa7fdfdffffe20905495555a8aaa4bdffd3f7fffffbfda0025552244552553fdfd7dfffff7ffed00aaa9ff2aa4a9577ffaffff7fdfffb6a241457f5252952bfffa7fffff7feedb00281fff2c94a493fedd7ffdfdff7fed08a6e8bf41412aabf67cf7f7ffffffea205927fe9458924bfd7e5f7ff7ffffdd02254efe5520a927d8febffffffffdeb08953fff4a90955375ff7ffffff777d6404abffe25514917f4ffffffdfdfffdb025482fb5248a4abf2f7fdddffffffed102574ae95252a93f5fffffffeffff560485155448a49257f4fff7ffffff7dfb0024d52b2692494bbadfbffffbfdf7d5248aaaa951555527fd7d9fbbbff7ffad002525552a4924abfcbf5fffffdffff70104aaaa49249293fe7e5effffffff55249554aaa555554bbffebffffeffdfad800aaa00149248abfffd3ff777ff7db6824a41552a452a93f7f6bfdffffdff5a812d2a4a915ea549ffde7bffffeffe82510e49244abb522bfeff3fffffbff858042924aaa4619555dfff5f7eeeffe5452088aa9112b1a491ff9f9dfbffffca50520d124a427b924afb5fdffffffda50a08784928113faaaaef3ffffffff790a8945e0482849f49247e9dffdfbbbe5544216f5028204a5492be5ff6fdfffe9495045bc900aa2292a97f5fdffffffd4a22406efc95548849149e9f7ff7fdec212914bfb755540104425f5defdfdffaacca404bfd556b5421092f8fc77fffb9422492ded6aaad0008405dd7b7ff7df89942416ffd5555c4421207cb8ffdf7f245294bbb6eaaaa702080a7f3eff7fff9349406dffaaaab99042a017b96dfffb08a41236dad5554d6228051bfcbffdee9512805affa95575a8012046ae3ff7fd80a92275b6d5559696240912bbbfdfb6ca04083bff55556ad8c14041568d7edaa0a0806ddbd2aaaa96e815086af6d56b520824f7feea955b594e40221d555b55a84280badbb5aaaaccaa1200835b6add770b08ebfed5d56d55e700a821adad6baaf402ddef6aeaab18aad40208356bad5b5400f7fddf7daad5674148a005b5556d50235dff75d6ed2db5e80002005ef6b5000177eddf7fb5b4d6b92a90a400098880099eff77eaeaa955d40004012100232882ebffdd7fbb2db6bf49212804490f0003b6faf7dbead4d36a80484140002520157bffbef6f5756db7ea02081554ae0087adfff7bfbb59b6dd7890824001d45c0aeaeeddedd5555577af0a280926b83447dbffff7f6dabb7adfde081200dedd60fafff77d5eab55af6affe0404f75d580d76fdfdffb5aeed5bf56ff1555afdb43f6fffdf6eeab557bd5ffaafaab753502af5f777fbbb56dad7edbdbadadaa92277bafffedfed6b6d6977d6d5556b5688dfedfdeffab5ad57b6bd7b6d5aaaaa40aaf7efbddff555bad8d7adb555564513f7aafffffb6d6ed6adbb5ed6b555b2a2bd7dfef76ed5b56dd5adfb5bd52aba87efaafffffdb6ab5b2a6b2dad755aa50d5ed6ffddf75aadb6d696b6e8daad500ff76ffbffddd5756db9d557576d2aac9f7dbafffffeab56db155551695aaa442ab56dfffeebd55b6dd2540da4e9d450b7db77fff7beb5aab6a9354ae4aaab202ef6daffdffdaab5aba54a96b1575481ff5ae7f77eeead56dd54382a5aa8a202bded2affffbf55b56b92b565aadc4aa76fb6ddfffbfb56adb6683b3aaaab1445beeb75efbf6f6ad6da920db6aa8ab50b55bdaafdeffb555b5652b6552a2b5215afd6fddf7ddeab6abb44a5554b0dd416f56f6bfbefff5aadd6bad42d54b521755ba9ddfebef555555b46a652ab15447bed56bff7f7beaadb6dbf34a92adb10eddd596afeddfad6adb6aad468aa9621ffedaeb7fff7dd5ad55b1d94fa2b2a035fb693d5f6bd75556dadca515aaa9545bbfad4a9ffeefd56b6f6af447ea5550aeff52ad4ffb55555ab5bf56a96aaaa57bfdede52fdfaaab5556d5f575d5555557ffb6ba9efab55aaddb6eba7aea95295adaed5d4ffe97aad6adb7d96faa656a57fff766afeb6d6b6ad6daed3daa9192b9555b5adfffb7aaad7ab77eb7d52d4a56ffe9f54eed7dd556abdbabff5452295b56beb6afffaeb5b5ad6dfedbd549554abbd54baffdb7d6aadb5b5755eb4524abaa2b6eadffdd756eb5b7fdb5555292aadaeadb5fef77dbb5dedd575555124a556b55768affbdeed5536dfeaaaa8929abbead92adbeef7bf6bdb756a95524a5accd5554abfbfbaf7b56dafb6a524a95d75354925defb6fbdaeb6faea954255279daaa4c877fffdeff5ab5fbaaaa29295eaad5b25dfeedf7db6ddead524aa54557ef6d2a9fefff5dfdb6b5d5a9525554ad77b2d54f7fd5ff6f55db5aa548954937ddd5525bfbfff7fdeeb7eaa9552524ad6eeea94fff6f7ddfb5dd2d54a255b557b75ba52f7ffbfff6d6abd48a910b57aadbecb5bdeddfdedfb5f6556aaaaad5556d56dc5ffff77bfedb2daa9544576bd6d5557667fffdfffbaddb2a552aaaaeab7aa6d542ddb7ff6fd6b6a95542adfebdadb5491bfffffbff7b6fa52ab4b757aa56ad245577dbefbd95ba9552555dfacabb6aaa85df7fbef76d6da94aaa56aeb54aa4a564bdffffffd6d7a55552abb6d5b552a82557feffdaeb7a92aa4ab6cb6d554d15449ffbffffbad7ea4929576256aeb2a5255feffbfed76d7555555abdd2bb55129536ffffb76ab7a292aaabcabb6baea444bfffefffaddafc495554b7d56edba9555bffbffeb6bd12a556afb555b6ad6a852fbdfff75b6ada11555adaaabb76ea14bff7fedd6adaada4aaadaad4ad5ba9555dfffffaadad5552ab56ab6aafaa6d552fdff7fb6af2d5a954ab54955557aaa4af7f7fed5b5b5ad2aaaad556a574aaa553fdff75adaaab495555555452aae55a8bffddf56aead56492aaaa932ad75aa4aadb7ff6b7252a91295555589555554555fbafd55592a4488492deaaaaaaaa64ab68add5ad54d2a2324aa555d555552524eb57aab5aa54114956a9aa5556a195552aaab6d694a94a2c95556ab55a9464aaaa55555aa55200925555b55554429</textarea><br>
+
+	<div id="canvas-box">
+		<div id="tool-box"  style="margin-bottom: 5px; margin-top: 10px;">
+			模式：
+			<select id="canvas-mode">
+				<option value="paint">画笔</option>
+				<option value="font" title="输入完成后 点击：保存文本框">输入文字</option>
+			</select>
+			画笔/文字大小：
+			<input type="number" max="13" min="1" step="1" value="3" id="paint-size">
+			画笔颜色：
+			<select id="paint-color">
+				<option value="red">红色</option>
+				<option value="white">白色</option>
+				<option value="black">黑色</option>
+			</select>
+
+			<select id="font" title="字体">
+				<option value="微软雅黑">微软雅黑</option>
+				<option value="黑体">黑体</option>
+				<option value="仿宋">仿宋</option>
+				<option value="宋体">宋体</option>
+				<option value="楷体_GB2312">楷体_GB2312</option>
+				<option value="仿宋_GB2312">仿宋_GB2312</option>
+			</select>
+			<button id="update-text" style="display: none">保存文本框</button>
+			<button onclick="clear_canvas()">清屏</button>
+		</div>
+		<br>
+		<input id="edit-font" style="max-width: 296px; position: absolute; border: black solid 1px;background-color: rgba(0,0,0,0);display: none;overflow: auto" />
+		<canvas id="canvas" width="296" height="128" style="border: black solid 1px;"></canvas>
+		<br>
+		<button onclick="upload_image()" style="font-weight: bold">立即上传到屏幕</button>
+		<br>
+	</div>
 
 	<br>
-	上传tiff到屏幕
-	<br>
-	<input type="file" id="tiff_file"> <button onclick="upload_tiff()">上传</button>
-	<br>
-	<br>
-	<br>
+	<h3>设置时间</h3>
 	<button id="time-setter" onclick="setTime()">设置时间为: </button>	<br>
 	偏移+<input type="number" max="24" min="0" id="hour-offset" value="0" style="width: 40px;">小时
 
+	<div id="tab_image">
+		<br>
+		<h3>屏幕控制</h3>
+		<input type="file">
+		<button type="button" onclick="upload_epd_buffer();">上传图片到显示器内存</button>
+		<br>
+		<textarea id="buffer" rows="10" cols="90">00240219fffed5094098000000000000828ab4897f6b6aa129420000000a824008290042f7db6a8884a89248000554141244aa567e255624281440012490a10000d2400c790aa2a901020010000082822a091112554a954250480880000454500006490e4110097908802402a950a90a55724250041552a821008014020055400000205510420480010800a0000154105aa97008a111211088000aa000002982285444201404080200000550201240482a80a88042a000080800aa0002a814220400020128020a202005520080044108002000400228008020220a40000014420000000400805501001aa9040400010900000000000002441164ab4000012800000000000002900026aaa5100012014248008000040015203b5556422048000400020400104040034d52291909000000004000204000955ca9a954aaa0000200000000000000225655440220000000000000000000040bfad2bad0a4088080200000000200103edd1ad50500001012020000110001411bf569b892810000000002044000000e7f6e98ee0810248005e000010008050097dbaebba08000024a9500000000202f5d7555de55020008154000104493c2801fddb56a30882240ba9400012101e1af776b6db9670000084a50000044ebe923ddf6dad48a000023da9501001cc7cc477badb774a0088901baaa00159d61cc54ed76ddca1020000bd94900505effdd41bedb6b6142000096b6a40a866ec7ec40f5adbda00001222ad555c12915eff84ffed6d6c2504000153aaa6094abefffc35b7b6d820204047aca9448c241ffbad0fdadb748900010ed5552203b55ffffd476d6ddd2802041fb5555948ca8fbff63bf6b6b13120202beaaaa4011056ffe773dbdbd6620000af6aaaaac016177ff9fdad6d78d691003ddaaa921c2a9d7ff5f7f5b7a0cf80116f755555498970bfe5feaeda90ada400b5fd5544299214fff9dfb56dcb5fd042d556aa24d4c0493efffb6fb760ad5001adfaa5512149a0afffffdadac55fb10ab7df552c95a2153fffeef56f6116c0035f6954952c449157ffffdfbba54d5023ebffaaa804a595afdfff756d6a97a207eaed5545688068f3fff7eef7b1554043f5b564a2126a9487bfdff5ad4292b407def5eaa144905051dbfedef7b74e8503f3556ab49242820f6fffeb5aa75a6207dfeaaa4248a228a2bfff5bb7c54aa813eab555550a1085177fffed684b3a4003dbd755584cd350b9bfff5bda5eea5243fa79aaa20aa8a246dffbeeb572595003f596abd24528293abfdeb49459749403eed2a8b09a5490577dff92c26dca4121faaaab7418a28a5af7fe5438bab52801d55655d10645152daf79558a2ed95280faab52b624610ab6b5caaad53aa950207d56aad08024244b5555552a5d51488277ad52702100811a54aaaad728ac64003ed6a92584025996ab55552fb25699103ffaa570029054db4aaaabff912954409f5d55100000496bf956adffa0aa52823fab54e220424aaddf5b5bff8868aa000fb5ab300408277621495fff8d2555240edd54a0002009ab9d6d7dff902455400756ab512082455fe1253bff80550a1042b56ca002016965fa29bbff90624a810555b55000088126ffcebdfed6480a481eca42511000a4ab7fc17fffba6013205ba2fda001201115fd74bbfbae00808a5ee9052000104601efda1bee7b9105a92bb27bd209422495beb749bddefcf294beec0da020a08853ffdda7f377bff1614aba9ba000a2025beab6d08eddefd9282f4d2ab0004a2457bf6f55fbf77b7d914af2974002008a1bd5dac35ebdeffee12fbaa6b090242356ff774eebd7bdeed282ee16a00040413bb7bbebbefeffbf082b5ab552110129affded4debb7d6fc5e00a054a4080422fb6fb79ebddd7ff7ba42ab2ea02210054ffefad7d777fbbfdd1aa8b55404408a6b7bef5afddedefffe65546ab04520354beffabf5777f7f6f50007db5122a40a137fb7aafddd5fbff2a685b5700061046eddf53faf7ffaffd19507daa11280522177d55575d5bff6dc86d2edd0480880455f746ddf7fed17beb543ab6020a28db81ff8deebdab7fb7e4aa1f6b2848400777bd4777d77effd769b41add000405143bf785bafbedffa9ecd51f761090a0f62fdedf6f547deef5f6544baf0040112ebf7db5daf0177bbf77550ed540021937dffeeeefa01d6fbfbf549fa724044c7b5dd77b7a802da997dbaa8eab00840b7ffffbadaf001bf665eb8a875540104bf5ff6d77f5017d7ff07dca15ea040121db6dfbdd5e006fb7d695c58f6a400081fbffdeb7ea0857df626ce27d0a092425fffff5ed5c00eea78bff75faf5000191ffdb7b5bf6017f7d5fe1aff3ba4002043effd77d5e10bdaabdae3fc36e1048a2b7fffdd7ea0037ab6f55bf07fb4009b16feed6babe006f7fd895fd415d01020419fffbefd701e5ffaeabf637f64051495dfbfcb57a059a6adf5779515a00580273bfb73faf8067bdbf93e059eb044ca86fffffc57ac00fcaffe5d4a1b4007e8aeff6fdf9dfe01afff7e048215a103fdcf5dfefb6b5521fffbef99289aa013ff8ffffffff4bfdf6aafbfe8810d5025dfafffdbb6af4b77fffeffaa54aba131fe67fbfffffbe9ddbffff2ec000c9082ffdfdf7dfdaebe2faad1df33c40502207fdfffefb7f7ebd177e4afdd710de0297feffffeff5abefe9d57afe77486b119fffffffffdefebafff8ff771db4fd0a7fffffffbef7abefaa7eaf1b96d22aa51ffffffffffafebdffaff3edf7287f153fffffffffaf57ef6fdbfdced1d66aa55ffffffffbfbfabbfad7fafeb3b835555fffffffff7d5feeaff7fdef067236955fffffffffefeabbff77feeff2fa5b555ffffffff7fd7feedbdfdd7e35f835aabffffffffeefaabffef7fef75f843a555ffffffffffdffea0117fef37e762faaafffffffffb6aab154a7fe7f5aa875555dffffff77ffff0aaa95bd76edde1daaa7fffffdfffd50a91253f56fd56a3652afffffffffffd4a4c94958f5e8d01baaaffffffbdffa8a552aaaabebc4002d5555dffffddefe5292a494a95d5ea81f95577dfffbdffd4a4a5520f7bfe600355555dfffffdff8a95512952dfff62d1eaaaa5ffefbdfe29552ffffda3754d4175555a7ff7dbf8a5207ffffe12de46a9aa92a5aeffdff55409ffffff41219b50f4aaaabff7bbe492d7fffffe545ccd69a555555bfbdbcaaa4fffdfff23220ea9faaaaaaafbdba4953ffdfeefac954b50a555556dfbdb15497feffffffea92951faaaab557dda52557f73fbfffaa55250a54a5556fdc14aa5fdc7effff4548924f4aaaaab7d14a92bffaffffbf54a6a915aaaaab5be829557ef2fbfefb5291244e555555af055524efebfffbff4a54928b529556b4488954fef5ffffffa955290ea820aad1455493f8f1dfdfff9524c54b454a2aaaa892abf5fafeffff24aa2a4d12aa954a264a4be5fafffff79281542694494925f15557cbedffffdfca6e490742a4a453faa4afabfffbfeffc29120558915124bfa528fd7fffff7ffe8a4aa8660a4a9571a955fcbffefdfffe208904b9a0005261a492eefdfbffffff8a0a286492a9253b9549fe3fefffffdfc0b292b55400129f5255ff7ffff7fefdf208086aaa8a54449555ff3f3ffff7fff882408552b522b24893fffa7fdfdffffe20905495555a8aaa4bdffd3f7fffffbfda0025552244552553fdfd7dfffff7ffed00aaa9ff2aa4a9577ffaffff7fdfffb6a241457f5252952bfffa7fffff7feedb00281fff2c94a493fedd7ffdfdff7fed08a6e8bf41412aabf67cf7f7ffffffea205927fe9458924bfd7e5f7ff7ffffdd02254efe5520a927d8febffffffffdeb08953fff4a90955375ff7ffffff777d6404abffe25514917f4ffffffdfdfffdb025482fb5248a4abf2f7fdddffffffed102574ae95252a93f5fffffffeffff560485155448a49257f4fff7ffffff7dfb0024d52b2692494bbadfbffffbfdf7d5248aaaa951555527fd7d9fbbbff7ffad002525552a4924abfcbf5fffffdffff70104aaaa49249293fe7e5effffffff55249554aaa555554bbffebffffeffdfad800aaa00149248abfffd3ff777ff7db6824a41552a452a93f7f6bfdffffdff5a812d2a4a915ea549ffde7bffffeffe82510e49244abb522bfeff3fffffbff858042924aaa4619555dfff5f7eeeffe5452088aa9112b1a491ff9f9dfbffffca50520d124a427b924afb5fdffffffda50a08784928113faaaaef3ffffffff790a8945e0482849f49247e9dffdfbbbe5544216f5028204a5492be5ff6fdfffe9495045bc900aa2292a97f5fdffffffd4a22406efc95548849149e9f7ff7fdec212914bfb755540104425f5defdfdffaacca404bfd556b5421092f8fc77fffb9422492ded6aaad0008405dd7b7ff7df89942416ffd5555c4421207cb8ffdf7f245294bbb6eaaaa702080a7f3eff7fff9349406dffaaaab99042a017b96dfffb08a41236dad5554d6228051bfcbffdee9512805affa95575a8012046ae3ff7fd80a92275b6d5559696240912bbbfdfb6ca04083bff55556ad8c14041568d7edaa0a0806ddbd2aaaa96e815086af6d56b520824f7feea955b594e40221d555b55a84280badbb5aaaaccaa1200835b6add770b08ebfed5d56d55e700a821adad6baaf402ddef6aeaab18aad40208356bad5b5400f7fddf7daad5674148a005b5556d50235dff75d6ed2db5e80002005ef6b5000177eddf7fb5b4d6b92a90a400098880099eff77eaeaa955d40004012100232882ebffdd7fbb2db6bf49212804490f0003b6faf7dbead4d36a80484140002520157bffbef6f5756db7ea02081554ae0087adfff7bfbb59b6dd7890824001d45c0aeaeeddedd5555577af0a280926b83447dbffff7f6dabb7adfde081200dedd60fafff77d5eab55af6affe0404f75d580d76fdfdffb5aeed5bf56ff1555afdb43f6fffdf6eeab557bd5ffaafaab753502af5f777fbbb56dad7edbdbadadaa92277bafffedfed6b6d6977d6d5556b5688dfedfdeffab5ad57b6bd7b6d5aaaaa40aaf7efbddff555bad8d7adb555564513f7aafffffb6d6ed6adbb5ed6b555b2a2bd7dfef76ed5b56dd5adfb5bd52aba87efaafffffdb6ab5b2a6b2dad755aa50d5ed6ffddf75aadb6d696b6e8daad500ff76ffbffddd5756db9d557576d2aac9f7dbafffffeab56db155551695aaa442ab56dfffeebd55b6dd2540da4e9d450b7db77fff7beb5aab6a9354ae4aaab202ef6daffdffdaab5aba54a96b1575481ff5ae7f77eeead56dd54382a5aa8a202bded2affffbf55b56b92b565aadc4aa76fb6ddfffbfb56adb6683b3aaaab1445beeb75efbf6f6ad6da920db6aa8ab50b55bdaafdeffb555b5652b6552a2b5215afd6fddf7ddeab6abb44a5554b0dd416f56f6bfbefff5aadd6bad42d54b521755ba9ddfebef555555b46a652ab15447bed56bff7f7beaadb6dbf34a92adb10eddd596afeddfad6adb6aad468aa9621ffedaeb7fff7dd5ad55b1d94fa2b2a035fb693d5f6bd75556dadca515aaa9545bbfad4a9ffeefd56b6f6af447ea5550aeff52ad4ffb55555ab5bf56a96aaaa57bfdede52fdfaaab5556d5f575d5555557ffb6ba9efab55aaddb6eba7aea95295adaed5d4ffe97aad6adb7d96faa656a57fff766afeb6d6b6ad6daed3daa9192b9555b5adfffb7aaad7ab77eb7d52d4a56ffe9f54eed7dd556abdbabff5452295b56beb6afffaeb5b5ad6dfedbd549554abbd54baffdb7d6aadb5b5755eb4524abaa2b6eadffdd756eb5b7fdb5555292aadaeadb5fef77dbb5dedd575555124a556b55768affbdeed5536dfeaaaa8929abbead92adbeef7bf6bdb756a95524a5accd5554abfbfbaf7b56dafb6a524a95d75354925defb6fbdaeb6faea954255279daaa4c877fffdeff5ab5fbaaaa29295eaad5b25dfeedf7db6ddead524aa54557ef6d2a9fefff5dfdb6b5d5a9525554ad77b2d54f7fd5ff6f55db5aa548954937ddd5525bfbfff7fdeeb7eaa9552524ad6eeea94fff6f7ddfb5dd2d54a255b557b75ba52f7ffbfff6d6abd48a910b57aadbecb5bdeddfdedfb5f6556aaaaad5556d56dc5ffff77bfedb2daa9544576bd6d5557667fffdfffbaddb2a552aaaaeab7aa6d542ddb7ff6fd6b6a95542adfebdadb5491bfffffbff7b6fa52ab4b757aa56ad245577dbefbd95ba9552555dfacabb6aaa85df7fbef76d6da94aaa56aeb54aa4a564bdffffffd6d7a55552abb6d5b552a82557feffdaeb7a92aa4ab6cb6d554d15449ffbffffbad7ea4929576256aeb2a5255feffbfed76d7555555abdd2bb55129536ffffb76ab7a292aaabcabb6baea444bfffefffaddafc495554b7d56edba9555bffbffeb6bd12a556afb555b6ad6a852fbdfff75b6ada11555adaaabb76ea14bff7fedd6adaada4aaadaad4ad5ba9555dfffffaadad5552ab56ab6aafaa6d552fdff7fb6af2d5a954ab54955557aaa4af7f7fed5b5b5ad2aaaad556a574aaa553fdff75adaaab495555555452aae55a8bffddf56aead56492aaaa932ad75aa4aadb7ff6b7252a91295555589555554555fbafd55592a4488492deaaaaaaaa64ab68add5ad54d2a2324aa555d555552524eb57aab5aa54114956a9aa5556a195552aaab6d694a94a2c95556ab55a9464aaaa55555aa55200925555b55554429</textarea><br>
+		<br>
+	</div>
 
 	<div id="log-box" style="position: absolute; right: 10px; top: 0px; width: 500px;height:50%;">
 		日志：
