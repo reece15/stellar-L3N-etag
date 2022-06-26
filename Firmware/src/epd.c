@@ -35,8 +35,8 @@ const char *BLE_conn_string[] = {"BLE 0", "BLE 1"};
 RAM uint8_t epd_temperature_is_read = 0;
 RAM uint8_t epd_temperature = 0;
 
-uint8_t epd_buffer[epd_buffer_size];
-uint8_t epd_temp[epd_buffer_size]; // for OneBitDisplay to draw into
+RAM uint8_t epd_buffer[epd_buffer_size];
+RAM uint8_t epd_temp[epd_buffer_size]; // for OneBitDisplay to draw into
 OBDISP obd;                        // virtual display structure
 TIFFIMAGE tiff;
 
