@@ -1,38 +1,13 @@
 const bwrPalette = [
-  [0, 0, 0, 0],
-  [255, 255, 255, 0],
-  [255, 0, 0, 0]
+  [0, 0, 0, 255],
+  [255, 255, 255, 255],
+  [255, 0, 0, 255]
 ]
 
 const bwPalette = [
-  [0, 0, 0, 0],
-  [255, 255, 255, 0],
+  [0, 0, 0, 255],
+  [255, 255, 255, 255],
 ]
-
-function get_near_color(color, palette) {
-  let minDistanceSquared = 255*255 + 255*255 + 255*255 + 1;
-
-  let bestIndex = 0;
-  for (let i = 0; i < palette.length; i++) {
-      let rdiff = (color[0] & 0xff) - (palette[i][0] & 0xff);
-      let gdiff = (color[1] & 0xff) - (palette[i][1] & 0xff);
-      let bdiff = (color[2] & 0xff) - (palette[i][2] & 0xff);
-      let distanceSquared = rdiff*rdiff + gdiff*gdiff + bdiff*bdiff;
-      if (distanceSquared < minDistanceSquared) {
-          minDistanceSquared = distanceSquared;
-          bestIndex = i;
-      }
-  }
-  return bestIndex;
-
-}
-
-function updatePixel(imageData, index, color) {
-  imageData[index] = color[0];
-  imageData[index+1] = color[1];
-  imageData[index+2] = color[2];
-  imageData[index+3] = color[3];
-}
 
 function dithering(ctx, width, height, threshold, type) {
   const bayerThresholdMap = [
@@ -104,7 +79,7 @@ function dithering(ctx, width, height, threshold, type) {
   ctx.putImageData(imageData, 0, 0);
 }
 
-function canvas2bytes(canvas, rotate=1) {
+function canvas2bytes(canvas, type='bw') {
   const ctx = canvas.getContext("2d");
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
@@ -114,7 +89,12 @@ function canvas2bytes(canvas, rotate=1) {
   for (let x = canvas.width - 1; x >= 0; x--) {
     for (let y = 0; y < canvas.height; y++) {
       const index = (canvas.width * 4 * y) + x * 4;
-      buffer.push(imageData.data[index] > 0 ? 1 : 0);
+      if (type !== 'bwr') {
+        buffer.push(imageData.data[index] > 0 && imageData.data[index+1] > 0 && imageData.data[index+2] > 0 ? 1 : 0);
+      } else {
+        buffer.push(imageData.data[index] > 0 && imageData.data[index+1] === 0 && imageData.data[index+2] === 0 ? 1 : 0);
+      }
+
       if (buffer.length === 8) {
         arr.push(parseInt(buffer.join(''), 2));
         buffer = [];
@@ -124,25 +104,105 @@ function canvas2bytes(canvas, rotate=1) {
   return arr;
 }
 
-function scaleImageData(canvas, scale) {
-  const ctx = canvas.getContext("2d");
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const scaled = ctx.createImageData(imageData.width * scale, imageData.height * scale);
-  const subLine = ctx.createImageData(scale, 1).data
-  for (let row = 0; row < imageData.height; row++) {
-      for (let col = 0; col < imageData.width; col++) {
-          let sourcePixel = imageData.data.subarray(
-              (row * imageData.width + col) * 4,
-              (row * imageData.width + col) * 4 + 4
-          );
-          for (let x = 0; x < scale; x++) subLine.set(sourcePixel, x*4)
-          for (let y = 0; y < scale; y++) {
-              let destRow = row * scale + y;
-              let destCol = col * scale;
-              scaled.data.set(subLine, (destRow * scaled.width + destCol) * 4)
-          }
-      }
+function getColorDistance(rgba1, rgba2) {
+  const [r1, b1, g1] = rgba1;
+  const [r2, b2, g2] = rgba2;
+
+  const rm = (r1 + r2 ) / 2;
+
+  const r = r1 - r2;
+  const g = g1 - g2;
+  const b = b1 - b2;
+
+  return Math.sqrt((2 + rm / 256) * r * r + 4 * g * g + (2 + (255 - rm) / 256) * b * b);
+}
+
+function getNearColor(pixel, palette) {
+  let minDistance = 255 * 255 * 3 + 1;
+  let paletteIndex = 0;
+
+  for (let i = 0; i < palette.length; i++) {
+    const targetColor = palette[i];
+    const distance = getColorDistance(pixel, targetColor);
+    if (distance < minDistance) {
+      minDistance = distance;
+      paletteIndex = i;
+    }
   }
 
-  return scaled;
+  return palette[paletteIndex];
+}
+
+
+function getNearColorV2(color, palette) {
+  let minDistanceSquared = 255*255 + 255*255 + 255*255 + 1;
+
+  let bestIndex = 0;
+  for (let i = 0; i < palette.length; i++) {
+      let rdiff = (color[0] & 0xff) - (palette[i][0] & 0xff);
+      let gdiff = (color[1] & 0xff) - (palette[i][1] & 0xff);
+      let bdiff = (color[2] & 0xff) - (palette[i][2] & 0xff);
+      let distanceSquared = rdiff*rdiff + gdiff*gdiff + bdiff*bdiff;
+      if (distanceSquared < minDistanceSquared) {
+          minDistanceSquared = distanceSquared;
+          bestIndex = i;
+      }
+  }
+  return palette[bestIndex];
+
+}
+
+
+function updatePixel(imageData, index, color) {
+  imageData[index] = color[0];
+  imageData[index+1] = color[1];
+  imageData[index+2] = color[2];
+  imageData[index+3] = color[3];
+}
+
+function getColorErr(color1, color2, rate) {
+  const res = [];
+  for (let i = 0; i < 3; i++) {
+    res.push(Math.floor((color1[i] - color2[i]) / rate));
+  }
+  return res;
+}
+
+function updatePixelErr(imageData, index, err, rate) {
+  imageData[index] += err[0] * rate;
+  imageData[index+1] += err[1] * rate;
+  imageData[index+2] += err[2] * rate;
+}
+
+function ditheringCanvasByPalette(canvas, palette, type) {
+  palette = palette || bwrPalette;
+
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const w = imageData.width;
+
+  for (let currentPixel = 0; currentPixel <= imageData.data.length; currentPixel+=4) {
+    const newColor = getNearColorV2(imageData.data.slice(currentPixel, currentPixel+4), palette);
+
+    if (type === "bwr_floydsteinberg") {
+      const err = getColorErr(imageData.data.slice(currentPixel, currentPixel+4), newColor, 16);
+
+      updatePixel(imageData.data, currentPixel, newColor);
+      updatePixelErr(imageData.data, currentPixel +4, err, 7);
+      updatePixelErr(imageData.data, currentPixel + 4*w - 4, err, 3);
+      updatePixelErr(imageData.data, currentPixel + 4*w, err, 5);
+      updatePixelErr(imageData.data, currentPixel + 4*w + 4, err, 1);
+    } else {
+      const err = getColorErr(imageData.data.slice(currentPixel, currentPixel+4), newColor, 8);
+
+      updatePixel(imageData.data, currentPixel, newColor);
+      updatePixelErr(imageData.data, currentPixel +4, err, 1);
+      updatePixelErr(imageData.data, currentPixel +8, err, 1);
+      updatePixelErr(imageData.data, currentPixel +4 * w - 4, err, 1);
+      updatePixelErr(imageData.data, currentPixel +4 * w, err, 1);
+      updatePixelErr(imageData.data, currentPixel +4 * w + 4, err, 1);
+      updatePixelErr(imageData.data, currentPixel +8 * w, err, 1);
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
 }

@@ -10,7 +10,7 @@ void set_EPD_wait_flush();
 
 void init_epd(void);
 uint8_t EPD_read_temp(void);
-void EPD_Display(unsigned char *image, int size, uint8_t full_or_partial);
+void EPD_Display(unsigned char *image, unsigned char * red_image, int size, uint8_t full_or_partial);
 void epd_display_tiff(uint8_t *pData, int iSize);
 void epd_set_sleep(void);
 uint8_t epd_state_handler(void);

@@ -19,6 +19,7 @@
 		}
 		body {
 			padding: 20px;
+			overflow-y: hidden;
 		}
 	</style>
 	<script type="application/javascript" src="js/dithering.js"></script>
@@ -112,27 +113,36 @@
 			addLog(`上传tiff完成，耗时${(new Date().getTime() - startTime)/1000}s`);
 		}
 
+		async function sendBufferData(value, type) {
+			addLog(`开始发送图片模式:${type}, 大小 ${value.length/2/1024}KB`);
+			let code = 'ff';
+			if (type === 'bwr') {
+				code = '00';
+			}
+			const step = 480;
+			let partIndex = 0;
+			for (let i = 0; i < value.length; i += step) {
+				addLog(`正在发送第${partIndex+1}块. 块大小: ${step/2 + 4}byte. 起始位置: ${i/2}`);
+				await sendCommand(hexToBytes("03" + code + intToHex(i / 2, 2) + value.substring(i, i + step)));
+				partIndex += 1;
+			}
+		}
+
 		async function upload_image() {
 			const canvas = document.getElementById('canvas');
-			const value = bytesToHex(canvas2bytes(canvas));
+
 
 			const startTime = new Date().getTime();
 
-			addLog(`开始刷新屏幕内存, 大小 ${value.length/2/1024}KB`);
 
 			await sendCommand(hexToBytes("0000"));
 
 			await sendCommand(hexToBytes("020000"));
 
-			const step = 480;
-			let partIndex = 0;
-			for (let i = 0; i < value.length; i += step) {
-				addLog(`正在发送第${partIndex+1}块. 块大小: ${step/2 + 3}byte. 起始位置: ${i/2}`);
-				await sendCommand(hexToBytes("03" + intToHex(i / 2, 2) + value.substring(i, i + step)));
-				partIndex += 1;
-			}
+			await sendBufferData(bytesToHex(canvas2bytes(canvas)), 'bw')
+			await sendBufferData(bytesToHex(canvas2bytes(canvas, 'bwr')), 'bwr')
 
-			await sendCommand(hexToBytes("01"))
+			await sendCommand(hexToBytes("0101"))
 
 			addLog(`刷新完成，耗时${(new Date().getTime() - startTime)/1000}s`);
 		}
@@ -147,16 +157,11 @@
 
 			await sendCommand(hexToBytes("020000"));
 
-			const step = 480;
-			let partIndex = 0;
-			for (let i = 0; i < value.length; i += step) {
-				addLog(`正在发送第${partIndex+1}块. 块大小: ${step/2 + 3}byte. 起始位置: ${i/2}`);
-				await sendCommand(hexToBytes("03" + intToHex(i / 2, 2) + value.substring(i, i + step)));
-				partIndex += 1;
-			}
+			await sendBufferData(value, 'bw');
+
 			await delay(150);
 
-			await sendCommand(hexToBytes("01"))
+			await sendCommand(hexToBytes("0101"))
 
 			addLog(`刷新完成，耗时${(new Date().getTime() - startTime)/1000}s`);
 		}
@@ -301,14 +306,20 @@
 			if(confirm('确认清除屏幕?')) {
 				const canvas = document.getElementById('canvas');
 				const ctx = canvas.getContext("2d");
-				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				ctx.fillStyle = 'white';
+				ctx.fillRect(0, 0, canvas.width, canvas.height);
 			}
 		}
 
 		function convert_dithering() {
 			const canvas = document.getElementById('canvas');
 			const ctx = canvas.getContext("2d");
-			dithering(ctx, canvas.width, canvas.height, parseInt(document.getElementById('threshold').value), document.getElementById('dithering').value);
+			const mode = document.getElementById('dithering').value;
+			if (mode.startsWith('bwr')) {
+				ditheringCanvasByPalette(canvas, bwrPalette, mode);
+			} else {
+				dithering(ctx, canvas.width, canvas.height, parseInt(document.getElementById('threshold').value), mode);
+			}
 		}
 
 		document.body.onload = () => {
@@ -318,6 +329,9 @@
 			}, 1000);
 
 			const canvas = document.getElementById('canvas');
+			const ctx = canvas.getContext("2d");
+			ctx.fillStyle = 'white';
+			ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 			let is_allow_drawing = false;
 			let is_allow_move_editor = false;
@@ -326,7 +340,7 @@
 			const paint_color = document.getElementById('paint-color');
 			const editor = document.getElementById('edit-font');
 			const font = document.getElementById('font');
-			document.getElementById('dithering').value = 'Atkinson';
+			document.getElementById('dithering').value = 'bwr_Atkinson';
 			image_mode.value = 'paint';
 			paint_color.value = 'black';
 			font.value = '黑体';
@@ -335,6 +349,7 @@
 				editor.style.fontSize = `${paint_size.value * 10}px`;
 				editor.style.color = paint_color.value;
 				editor.style.fontFamily = font.value;
+				editor.style.fontWeight = 'bold';
 
 				if (is_allow_move_editor) {
 					const {x, y} = get_position(canvas, e.clientX, e.clientY);
@@ -342,8 +357,8 @@
 						return;
 					}
 
-					editor.style.left = `${e.clientX-50}px`;
-					editor.style.top = `${e.clientY-50}px`;
+					editor.style.left = `${e.clientX-20}px`;
+					editor.style.top = `${e.clientY-20}px`;
 
 				}
 			}
@@ -362,9 +377,8 @@
 					return;
 				}
 				editor.style.display = 'none';
-				const ctx = canvas.getContext("2d");
 				ctx.beginPath();
-				ctx.font = `${paint_size.value * 10}px ${font.value}`;
+				ctx.font = `bold ${paint_size.value * 10}px ${font.value}`;
 				ctx.fillStyle = paint_color.value;
 				const {x, y} = get_position(canvas, parseInt(editor.style.left), parseInt(editor.style.top) + paint_size.value * 10);
 
@@ -407,7 +421,6 @@
 			canvas.onmousedown = function(e) {
 				let ele = get_position(canvas, e.clientX, e.clientY)
 				let { x, y } = ele
-				const ctx = canvas.getContext("2d");
 
 				switch (image_mode.value) {
 					case 'paint':
@@ -416,14 +429,13 @@
 						ctx.moveTo(x, y);
 						break;
 					case 'font':
-						if (editor.style.display === 'none') {
-							editor.style.display='block';
-							editor.style.left = `${e.clientX}px`;
-							editor.style.top = `${e.clientY}px`;
-							editor.style.fontSize = `${paint_size.value * 10}px`;
-							editor.style.color = paint_color.value;
-							editor.style.fontFamily = font.value;
-						}
+						editor.style.display='block';
+						editor.style.left = `${e.clientX}px`;
+						editor.style.top = `${e.clientY}px`;
+						editor.style.fontSize = `${paint_size.value * 10}px`;
+						editor.style.color = paint_color.value;
+						editor.style.fontFamily = font.value;
+						editor.style.fontWeight = 'bold';
 
 						break
 					default:
@@ -432,7 +444,6 @@
 			};
 
 			canvas.onmousemove = (e) => {
-				const ctx = canvas.getContext("2d");
 				let ele = get_position(canvas, e.clientX, e.clientY)
 				let { x, y } = ele;
 				switch (image_mode.value) {
@@ -475,9 +486,9 @@
 			}
 		}
 	</script>
-	<h2>电子价签蓝牙控制器</h2>
-	<a href="/uart_flasher.html">串口升级</a><a href="/ATC_TLSR_Paper%20BLE%20control.html">串口升级</a>
-		<br>
+	<h2>电子价签蓝牙控制器<a style="margin-left: 130px;" href="/uart_flasher.html">串口升级</a><a href="/ATC_TLSR_Paper%20BLE%20control.html">蓝牙OTA升级</a>
+	</h2>
+
 
 	<button id="connectbutton" type="button" onclick="preConnect();">链接</button>
 	<button type="button" onclick="reConnect();">重新链接</button>
@@ -488,7 +499,6 @@
 	<input type="text" id="cmdTXT" value="0055">
 	<button type="button" onclick="triggerEpdCmd(document.getElementById(&quot;cmdTXT&quot;).value);">发送指令</button>
 	<br>
-	<br>
 	<button type="button" onclick="triggerRxTxCmd('e100')" title="点击该按钮，然后上传图片。图片将永久显示到屏幕上">设置为图片模式</button>
 	<button type="button" onclick="triggerRxTxCmd('e101')" title="点击该按钮, 切换为时钟模式">设置为时钟模式1</button>
 	<button type="button" onclick="triggerRxTxCmd('e102')" title="点击该按钮, 切换为时钟模式">设置为时钟模式2</button>
@@ -497,13 +507,19 @@
 	<br><br>
 
 	<h3>上传图片到屏幕</h3>
-	<input type="file" id="image_file" onchange="update_image()">
+	<input type="file" id="image_file" onchange="update_image()" accept=".png,.jpg,.bmp,.webp">
 	抖动算法：
 	<select id="dithering" title="抖动算法">
-		<option value="none">二值化</option>
-		<option value="bayer">bayer</option>
-		<option value="floydsteinberg">floydsteinberg</option>
-		<option value="Atkinson">Atkinson</option>
+		<optgroup label="黑白">
+			<option value="none">二值化</option>
+			<option value="bayer">bayer</option>
+			<option value="floydsteinberg">floydsteinberg</option>
+			<option value="Atkinson">Atkinson</option>
+		</optgroup>
+		<optgroup label="黑白红多色">
+			<option value="bwr_floydsteinberg">黑白红floydsteinberg</option>
+			<option value="bwr_Atkinson">黑白红Atkinson</option>
+		</optgroup>
 	</select>
 	阈值:
 	<input type="number" max="255" min="0" value="125" id="threshold">
@@ -511,7 +527,7 @@
 	<br>
 
 	<div id="canvas-box">
-		<div id="tool-box"  style="margin-bottom: 5px; margin-top: 10px;">
+		<div id="tool-box">
 			模式：
 			<select id="canvas-mode">
 				<option value="paint">画笔</option>
@@ -532,12 +548,11 @@
 				<option value="仿宋">仿宋</option>
 				<option value="宋体">宋体</option>
 				<option value="楷体_GB2312">楷体_GB2312</option>
-				<option value="仿宋_GB2312">仿宋_GB2312</option>
+				<option value="华文行楷">华文行楷</option>
 			</select>
 			<button id="update-text" style="display: none">保存文本框</button>
 			<button onclick="clear_canvas()">清屏</button>
 		</div>
-		<br>
 		<input id="edit-font" style="max-width: 296px; position: absolute; border: black solid 1px;background-color: rgba(0,0,0,0);display: none;overflow: auto" />
 		<canvas id="canvas" width="296" height="128" style="border: black solid 1px;"></canvas>
 		<br>

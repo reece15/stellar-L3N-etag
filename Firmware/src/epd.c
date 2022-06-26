@@ -7,7 +7,7 @@
 #include "epd_bw_213.h"
 #include "epd_bwr_213.h"
 #include "epd_bw_213_ice.h"
-#include "epd_bwr_154.h"
+//#include "epd_bwr_154.h"
 #include "epd_bwr_296.h"
 #include "drivers.h"
 #include "stack/ble/ble.h"
@@ -82,10 +82,10 @@ _attribute_ram_code_ void EPD_detect_model(void)
     {
         epd_model = 2;
     }
-    else if (EPD_BWR_154_detect())// Right now this will never trigger, the 154 is same to 213BWR right now.
-    {
-        epd_model = 3;
-    }
+//    else if (EPD_BWR_154_detect())// Right now this will never trigger, the 154 is same to 213BWR right now.
+//    {
+//        epd_model = 3;
+//    }
     else if (EPD_BW_213_ice_detect())
     {
         epd_model = 4;
@@ -120,8 +120,8 @@ _attribute_ram_code_ uint8_t EPD_read_temp(void)
         epd_temperature = EPD_BW_213_read_temp();
     else if (epd_model == 2)
         epd_temperature = EPD_BWR_213_read_temp();
-    else if (epd_model == 3)
-        epd_temperature = EPD_BWR_154_read_temp();
+//    else if (epd_model == 3)
+//        epd_temperature = EPD_BWR_154_read_temp();
     else if (epd_model == 4 || epd_model == 5)
         epd_temperature = EPD_BW_213_ice_read_temp();
 
@@ -132,7 +132,7 @@ _attribute_ram_code_ uint8_t EPD_read_temp(void)
     return epd_temperature;
 }
 
-_attribute_ram_code_ void EPD_Display(unsigned char *image, int size, uint8_t full_or_partial)
+_attribute_ram_code_ void EPD_Display(unsigned char *image, unsigned char *red_image, int size, uint8_t full_or_partial)
 {
     if (!epd_model)
         EPD_detect_model();
@@ -151,12 +151,13 @@ _attribute_ram_code_ void EPD_Display(unsigned char *image, int size, uint8_t fu
         epd_temperature = EPD_BW_213_Display(image, size, full_or_partial);
     else if (epd_model == 2)
         epd_temperature = EPD_BWR_213_Display(image, size, full_or_partial);
-    else if (epd_model == 3)
-        epd_temperature = EPD_BWR_154_Display(image, size, full_or_partial);
+//    else if (epd_model == 3)
+//        epd_temperature = EPD_BWR_154_Display(image, size, full_or_partial);
     else if (epd_model == 4)
         epd_temperature = EPD_BW_213_ice_Display(image, size, full_or_partial);
     else if (epd_model == 5)
-        epd_temperature = EPD_BWR_296_Display(image, size, full_or_partial);
+        epd_temperature = EPD_BWR_296_Display_BWR(image, red_image, size, full_or_partial);
+        //epd_temperature = EPD_BWR_296_Display(image, size, full_or_partial);
 
     epd_temperature_is_read = 1;
     epd_update_state = 1;
@@ -171,8 +172,8 @@ _attribute_ram_code_ void epd_set_sleep(void)
         EPD_BW_213_set_sleep();
     else if (epd_model == 2)
         EPD_BWR_213_set_sleep();
-    else if (epd_model == 3)
-        EPD_BWR_154_set_sleep();
+//    else if (epd_model == 3)
+//        EPD_BWR_154_set_sleep();
     else if (epd_model == 4 || epd_model == 5)
         EPD_BW_213_ice_set_sleep();
 
@@ -248,12 +249,12 @@ _attribute_ram_code_ void TIFFDraw(TIFFDRAW *pDraw)
 _attribute_ram_code_ void epd_display_tiff(uint8_t *pData, int iSize)
 {
     // test G4 decoder
-    memset(epd_buffer, 0xff, epd_buffer_size); // clear to white
+    epd_clear();
     TIFF_openRAW(&tiff, 250, 122, BITDIR_MSB_FIRST, pData, iSize, TIFFDraw);
     TIFF_setDrawParameters(&tiff, 65536, TIFF_PIXEL_1BPP, 0, 0, 250, 122, NULL);
     TIFF_decode(&tiff);
     TIFF_close(&tiff);
-    EPD_Display(epd_buffer, epd_buffer_size, 1);
+    EPD_Display(epd_buffer, NULL, epd_buffer_size, 1);
 }
 
 extern uint8_t mac_public[6];
@@ -296,6 +297,8 @@ _attribute_ram_code_ void epd_display(struct date_time _time, uint16_t battery_m
         resolution_h = 128;
     }
 
+    epd_clear();
+
     obdCreateVirtualDisplay(&obd, resolution_w, resolution_h, epd_temp);
     obdFill(&obd, 0, 0); // fill with white
 
@@ -312,7 +315,7 @@ _attribute_ram_code_ void epd_display(struct date_time _time, uint16_t battery_m
     sprintf(buff, "Battery %dmV  %d%%", battery_mv, battery_level);
     obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 10, 120, (char *)buff, 1);
     FixBuffer(epd_temp, epd_buffer, resolution_w, resolution_h);
-    EPD_Display(epd_buffer, resolution_w * resolution_h / 8, full_or_partial);
+    EPD_Display(epd_buffer, NULL, resolution_w * resolution_h / 8, full_or_partial);
 }
 
 _attribute_ram_code_ void epd_display_char(uint8_t data)
@@ -322,12 +325,13 @@ _attribute_ram_code_ void epd_display_char(uint8_t data)
     {
         epd_buffer[i] = data;
     }
-    EPD_Display(epd_buffer, epd_buffer_size, 1);
+    EPD_Display(epd_buffer, NULL, epd_buffer_size, 1);
 }
 
 _attribute_ram_code_ void epd_clear(void)
 {
     memset(epd_buffer, 0x00, epd_buffer_size);
+    memset(epd_temp, 0x00, epd_buffer_size);
 }
 void update_time_scene(struct date_time _time, uint16_t battery_mv, int16_t temperature, void (*scene)(struct date_time, uint16_t, int16_t,  uint8_t)) {
     // default scene: show default time, battery, ble address, temperature
@@ -375,6 +379,8 @@ void epd_update(struct date_time _time, uint16_t battery_mv, int16_t temperature
 void epd_display_time_with_date(struct date_time _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial) {
     uint16_t battery_level;
 
+    epd_clear();
+
     obdCreateVirtualDisplay(&obd, epd_width, epd_height, epd_temp);
     obdFill(&obd, 0, 0); // fill with white
 
@@ -408,5 +414,6 @@ void epd_display_time_with_date(struct date_time _time, uint16_t battery_mv, int
 
 
     FixBuffer(epd_temp, epd_buffer, epd_width, epd_height);
-    EPD_Display(epd_buffer, epd_width * epd_height / 8, full_or_partial);
+
+    EPD_Display(epd_buffer, NULL, epd_width * epd_height / 8, full_or_partial);
 }
