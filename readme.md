@@ -1,7 +1,6 @@
 ## hanshow stellar L3N 电子价签固件
 
 
-
 ### 适用型号 L3N@ (注意：只适配了L3N@ 2.9寸设备，原项目的其他型号可能已经不再兼容)
 
 
@@ -91,6 +90,10 @@ Firmware CRC32: 0xe62d501e
 ### 原始readme.md
 
 [README_EN.md](/README_en.md) （其他型号请参考原始项目，这个项目只支持L3N@ 2.9寸设备）
+
+> 注：
+> 基于该项目 [ATC_TLSR_Paper](https://github.com/atc1441/ATC_TLSR_Paper) 修改。
+
 
 ### 资料
 
