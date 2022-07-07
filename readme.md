@@ -1,13 +1,26 @@
 ## hanshow stellar L3N 电子价签固件
 
+### 适用型号 L3N@ (注意：只适配了L3N@ 2.9寸设备，原项目的其他型号可能已经不再兼容)
+
+### 最终效果
+
+#### web 上传图片
+![蓝牙管理](/images/web.jpg)
+
+#### 时钟模式2，图片模式
+![时钟模式2，图片模式](/images/1553702163.jpg)
+
+![时钟模式2，图片模式](/images/1587504241.jpg)
+
+
 
 ### 刷入固件步骤
 - 1. 拆开电池后盖观察主板是否是如下图所示。（或者查看主控是否为TLSR8359）
 
 ![焊接图示](/USB_UART_Flashing_connection.jpg)
 
-- 2. 焊接 GND, VCC, RX, RTS四根线。 RTS 可不焊。
-- 3. 使用usb2ttl模块(CH340)链接焊接的四根线。其中rx 链接 tx, tx链接 rx, vcc链接3.3v, GND链接 GND
+- 2. 焊接 GND, VCC, RX, RTS四根线。
+- 3. 使用usb2ttl模块(CH340)链接焊接的四根线。其中rx 链接 tx, tx链接 rx, vcc链接3.3v, GND链接 GND。RTS飞线和芯片CH340G第三脚链接（也可不焊，烧录前手动和GND连一下）。
 - 4. 打开https://atc1441.github.io/ATC_TLSR_Paper_UART_Flasher.html， 波特率选择默认 460800，Atime默认，文件选择Firmware/ATC_Paper.bin
 - 5. 先点击unlock,再点击write to flush,等待完成。成功后，屏幕会自动刷新。
 
@@ -48,7 +61,7 @@ Firmware CRC32: 0xe62d501e
 ### 上传图片
 - 1. 运行 `cd web_tools && python -m http.server`
 - 2. 打开 http://127.0.0.1:8000 后在页面上链接蓝牙
-- 3. 使用 tools/scripts/image2hex.py 生成图片的16进制字符串，复制到上面页面的输入框里
+- 3. 选择图片并上传，上传后可添加文字或者手动绘制文字。也可设置抖动算法。
 - 4. 发送到设备，等待屏幕刷新
 
 
@@ -70,24 +83,9 @@ Firmware CRC32: 0xe62d501e
 - [x] 三色抖动算法、设备端三色显示支持，蓝牙传输支持
 - [x] epd buffer刷新后 数据异常（左或右偶尔有黑条）？
 
-### 计划新增
-- [ ] 安卓端控制器
-    - [ ] 更新图片
-    - [ ] 修改设置
-    - [ ] 模板库
-        - [ ] 静态图片
-        - [ ] 文字模板
-        - [ ] 电子价签模板
-        - [ ] 停车牌
-        - [ ] 日历/时钟/温度计
-        - [ ]
-- [ ] 按键控制器
-    - [ ] 外壳3D建模
-- [ ] 2.4G RF通信
-
 ### 原始readme.md
 
-[README_EN.md](/README_en.md)
+[README_EN.md](/README_en.md) （其他型号请参考原始项目，这个项目只支持L3N@ 2.9寸设备）
 
 ### 资料
 
