@@ -25,7 +25,7 @@
 
 - 2. 焊接 GND, VCC, RX, RTS四根线。
 - 3. 使用usb2ttl模块(CH340)链接焊接的四根线。其中rx 链接 tx, tx链接 rx, vcc链接3.3v, GND链接 GND。RTS飞线和芯片CH340G第三脚链接（也可不焊，烧录前手动和GND连一下）。
-- 4. 打开https://atc1441.github.io/ATC_TLSR_Paper_UART_Flasher.html， 波特率选择默认 460800，Atime默认，文件选择Firmware/ATC_Paper.bin
+- 4. 打开https://atc1441.github.io/ATC_TLSR_Paper_UART_Flasher.html, 波特率选择默认 460800，Atime默认，文件选择Firmware/ATC_Paper.bin
 - 5. 先点击unlock,再点击write to flush,等待完成。成功后，屏幕会自动刷新。
 
 ### 项目编译
