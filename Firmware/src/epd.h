@@ -22,3 +22,4 @@ void epd_update(struct date_time _time, uint16_t battery_mv, int16_t temperature
 
 void epd_display(struct date_time _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial);
 void epd_display_time_with_date(struct date_time _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial);
+void epd_display_time_with_dragon_date(struct date_time _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial);

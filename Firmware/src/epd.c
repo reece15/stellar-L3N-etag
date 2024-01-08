@@ -95,7 +95,7 @@ _attribute_ram_code_ void EPD_detect_model(void)
     {
         epd_model = 1;
     }
-
+    epd_model = 5;
     EPD_POWER_OFF();
 }
 
@@ -372,6 +372,9 @@ void epd_update(struct date_time _time, uint16_t battery_mv, int16_t temperature
         case 2:
             update_time_scene(_time, battery_mv, temperature, epd_display_time_with_date);
             break;
+        case 3:
+            update_time_scene(_time, battery_mv, temperature, epd_display_time_with_dragon_date);
+            break;
         default:
             break;
     }
@@ -437,6 +440,91 @@ void epd_display_time_with_date(struct date_time _time, uint16_t battery_mv, int
         sprintf(buff, "%s", "ABCD");
     }
     obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16_zh, 200, 122, (char *)buff, 1);
+
+    FixBuffer(epd_temp, epd_buffer, epd_width, epd_height);
+
+    EPD_Display(epd_buffer, NULL, epd_width * epd_height / 8, full_or_partial);
+}
+
+void epd_display_time_with_dragon_date(struct date_time _time, uint16_t battery_mv, int16_t temperature, uint8_t full_or_partial) {
+    uint16_t battery_level;
+
+    epd_clear();
+
+    obdCreateVirtualDisplay(&obd, epd_width, epd_height, epd_temp);
+    obdFill(&obd, 0, 0); // fill with white
+
+    char buff[100];
+    battery_level = get_battery_level(battery_mv);
+
+    sprintf(buff, "%02X%02X", mac_public[2], mac_public[1]);
+    obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 1, 17, (char *)buff, 1);
+
+    if (ble_get_connected()) {
+        sprintf(buff, "%s", "234");
+    } else {
+        sprintf(buff, "%s", "256");
+    }
+
+    obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16_zh, 60, 20, (char *)buff, 1);
+
+    if (_time.tm_hour > 7 && _time.tm_hour < 12) {
+        sprintf(buff, "%s", "IMN");
+    } else if (_time.tm_hour == 12) {
+        sprintf(buff, "%s", "JMN");
+    } else if (_time.tm_hour >= 12 && _time.tm_hour < 20){
+        sprintf(buff, "%s", "KMN");
+    } else {
+        sprintf(buff, "%s", "LIN");
+    }
+    obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16_zh, 140, 20, (char *)buff, 1);
+
+    obdRectangle(&obd, 252, 10, 255, 14, 1, 1);
+    obdRectangle(&obd, 255, 2, 295, 22, 1, 1);
+
+    sprintf(buff, "%d", battery_level);
+    obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 259, 18, (char *)buff, 0);
+
+    obdRectangle(&obd, 0, 25, 295, 27, 1, 1);
+
+    sprintf(buff, "%s", "X");
+    obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16_zh, 1, 80, (char *)buff, 1);
+
+
+    sprintf(buff, "%02d:%02d", _time.tm_hour, _time.tm_min);
+    obdWriteStringCustom(&obd, (GFXfont *)&DSEG14_Classic_Mini_Regular_40, 50, 85, (char *)buff, 1);
+
+    sprintf(buff, "   %d'C", EPD_read_temp());
+    obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 216, 50, (char *)buff, 1);
+
+    obdRectangle(&obd, 216, 60, 295, 62, 1, 1);
+
+    sprintf(buff, " %dmV", battery_mv);
+    obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 216, 84, (char *)buff, 1);
+
+    obdRectangle(&obd, 214, 27, 216, 99, 1, 1);
+    obdRectangle(&obd, 0, 97, 295, 99, 1, 1);
+
+    sprintf(buff, "%d-%02d-%02d", _time.tm_year, _time.tm_month, _time.tm_day);
+    obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 10, 120, (char *)buff, 1);
+
+    if (_time.tm_week == 7) {
+        sprintf(buff, "9:%c", _time.tm_week + 0x20 + 6);
+    } else {
+        sprintf(buff, "9:%c", _time.tm_week + 0x20);
+    }
+    obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16_zh, 120, 122, (char *)buff, 1);
+
+    if (_time.tm_hour > 8 && _time.tm_hour < 22) {
+        sprintf(buff, "%s", "VW");
+        obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16_zh, 200, 122, (char *)buff, 1);
+        sprintf(buff, "BUG");
+        obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16, 250, 120, (char *)buff, 1);
+    } else {
+        sprintf(buff, "%s", "ABCD");
+        obdWriteStringCustom(&obd, (GFXfont *)&Dialog_plain_16_zh, 200, 122, (char *)buff, 1);
+    }
+
 
     FixBuffer(epd_temp, epd_buffer, epd_width, epd_height);
 
