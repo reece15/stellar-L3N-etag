@@ -1,4 +1,4 @@
-<h1 align="center">hanshow stellar L3N 电子价签固件</h1>
+<h1 align="center">hanshow stellar L3N 电子价签/airtag固件</h1>
 
 ### 适用型号 L3N@ (注意：只适配了L3N@ 2.9寸设备，原项目的其他型号可能已经不再兼容)
 
@@ -64,6 +64,12 @@ Firmware CRC32: 0xe62d501e
 - 3. 选择图片并上传，上传后可添加文字或者手动绘制文字。也可设置抖动算法。
 - 4. 发送到设备，等待屏幕刷新
 
+### 接入苹果findmy网络，模拟airtag
+- 设备已支持接入苹果findmy网络，(设备会通过蓝牙广播自动发送符合airtag协议的公钥，当设备附近的苹果设备接受到公钥时，就会使用公钥加密自己的位置信息然后发送到findmy服务器，用户可使用自己的私钥从苹果服务器获取设备的位置信息）
+- 该功能默认关闭
+- 打开该功能 需要修改ble.c文件 PUB_KEY=后的数据，改为你自己的公钥。PUB_KEY获取方法可参考项目(https://github.com/dchristl/macless-haystack 或者 https://github.com/malmeloo/openhaystack)
+- 打开该功能 还需要修改ble.c文件 AIR_TAG_OPEN=1
+
 ### 已解决/未解决问题
 
 - [X]  编译报错
@@ -83,6 +89,7 @@ Firmware CRC32: 0xe62d501e
 - [X]  三色抖动算法、设备端三色显示支持，蓝牙传输支持
 - [X]  epd buffer刷新后 数据异常（左或右偶尔有黑条）？
 - [X]  中文显示 （部分中文以bitmap显示，不支持全部中文）
+- [X]  支持接入苹果findmy网络，模拟airtag
 
 ### 原始readme.md
 

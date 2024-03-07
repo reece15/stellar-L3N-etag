@@ -20,7 +20,14 @@ uint8_t map[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
 _attribute_ram_code_ void init_time(void)
 {
     one_second_trimmed += time_trime;
-    current_unix_time = 0;
+    current_unix_time = 1709856857;
+    current_date.tm_year = 2024;
+    current_date.tm_month = 3;
+    current_date.tm_week = 5;
+    current_date.tm_day = 8;
+    current_date.tm_min = 14;
+    current_date.tm_hour = 0;
+    current_date.tm_sec = 17;
 }
 
 _attribute_ram_code_ void handler_time(void)

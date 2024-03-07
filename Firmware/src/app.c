@@ -44,7 +44,7 @@ _attribute_ram_code_ void main_loop(void)
 {
     blt_sdk_main_loop();
     handler_time();
-
+    uint8_t flag = 0;
     if (time_reached_period(Timer_CH_1, 30))
     {
         battery_mv = get_battery_mv();
@@ -53,6 +53,10 @@ _attribute_ram_code_ void main_loop(void)
         set_adv_data(EPD_read_temp() * 10, battery_level, battery_mv);
         ble_send_battery(battery_level);
         ble_send_temp(EPD_read_temp() * 10);
+        flag = 1;
+    }
+    if (!flag && time_reached_period(Timer_CH_3, 17)) {
+        set_air_tag_adv_data();
     }
 
     epd_update(get_time(), battery_mv, temperature);

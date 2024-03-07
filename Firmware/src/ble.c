@@ -49,6 +49,25 @@ RAM uint8_t advertising_data[] = {
 
 RAM uint8_t mac_public[6];
 
+RAM uint8_t PUB_KEY[28] = {
+    0x49,0x88,0x0,0x7a,0x27,0xac,0x38,0xb7,0x16,0x55,0x3c,0xc8,0x57,0x62,0x93,0xc3,0x95,0xef,0x3f,0x63,0x70,0xb2,0xa3,0x96,0x6d,0x4c,0x1a,0x7d //
+};
+
+RAM uint8_t air_tag_adv_data[31] = {
+    0x1e, /* Length (30) */
+    0xff, /* Manufacturer Specific Data (type 0xff) */
+    0x4c, 0x00, /* Company ID (Apple) */
+    0x12, 0x19, /* Offline Finding type and length */
+    0x00, /* State */
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, /* First two bits */
+    0x00, /* Hint (0x00) */
+};
+
+RAM uint8_t AIR_TAG_OPEN = 1;
+
 _attribute_ram_code_ void app_switch_to_indirect_adv(uint8_t e, uint8_t *p, int n)
 {
 	bls_ll_setAdvParam(ADVERTISING_INTERVAL, ADVERTISING_INTERVAL + 50, ADV_TYPE_CONNECTABLE_UNDIRECTED, OWN_ADDRESS_PUBLIC, 0, NULL, BLT_ENABLE_ADV_ALL, ADV_FP_NONE);
@@ -105,7 +124,19 @@ void init_ble(void)
 {
 	////////////////// BLE stack initialization ////////////////////////////////////
 	uint8_t mac_random_static[6];
-	blc_initMacAddress(CFG_ADR_MAC, mac_public, mac_random_static);
+
+	mac_public[5] = PUB_KEY[0] | 0b11000000;
+    mac_public[4] = PUB_KEY[1];
+    mac_public[3] = PUB_KEY[2];
+    mac_public[2] = PUB_KEY[3];
+    mac_public[1] = PUB_KEY[4];
+    mac_public[0] = PUB_KEY[5];
+
+    if(AIR_TAG_OPEN) {
+        blc_setMacAddress(CFG_ADR_MAC, mac_public);
+    } else {
+        blc_initMacAddress(CFG_ADR_MAC, mac_public, mac_random_static);
+    }
 
 	// Set the BLE Name to the last three MACs the first ones are always the same
 	const char *hex_ascii = {"0123456789ABCDEF"};
@@ -179,6 +210,16 @@ _attribute_ram_code_ void set_adv_data(int16_t temp, uint8_t battery_level, uint
 	advertising_data[16]++;
 
 	bls_ll_setAdvData((uint8_t *)advertising_data, sizeof(advertising_data));
+}
+
+_attribute_ram_code_ void set_air_tag_adv_data(void)
+{
+    if (AIR_TAG_OPEN) {
+        memcpy(&air_tag_adv_data[7], &PUB_KEY[6], 22);
+        air_tag_adv_data[29] = PUB_KEY[0] >> 6;
+
+        bls_ll_setAdvData((uint8_t *)air_tag_adv_data, sizeof(air_tag_adv_data));
+    }
 }
 
 _attribute_ram_code_ void ble_send_temp(int16_t temp)
