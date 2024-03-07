@@ -66,7 +66,7 @@ RAM uint8_t air_tag_adv_data[31] = {
     0x00, /* Hint (0x00) */
 };
 
-RAM uint8_t AIR_TAG_OPEN = 1;
+RAM uint8_t AIR_TAG_OPEN = 0;
 
 _attribute_ram_code_ void app_switch_to_indirect_adv(uint8_t e, uint8_t *p, int n)
 {
