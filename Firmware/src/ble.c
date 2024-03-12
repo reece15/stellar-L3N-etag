@@ -125,14 +125,14 @@ void init_ble(void)
 	////////////////// BLE stack initialization ////////////////////////////////////
 	uint8_t mac_random_static[6];
 
-	mac_public[5] = PUB_KEY[0] | 0b11000000;
-    mac_public[4] = PUB_KEY[1];
-    mac_public[3] = PUB_KEY[2];
-    mac_public[2] = PUB_KEY[3];
-    mac_public[1] = PUB_KEY[4];
-    mac_public[0] = PUB_KEY[5];
-
     if(AIR_TAG_OPEN) {
+        mac_public[5] = PUB_KEY[0] | 0b11000000;
+        mac_public[4] = PUB_KEY[1];
+        mac_public[3] = PUB_KEY[2];
+        mac_public[2] = PUB_KEY[3];
+        mac_public[1] = PUB_KEY[4];
+        mac_public[0] = PUB_KEY[5];
+
         blc_setMacAddress(CFG_ADR_MAC, mac_public);
     } else {
         blc_initMacAddress(CFG_ADR_MAC, mac_public, mac_random_static);
